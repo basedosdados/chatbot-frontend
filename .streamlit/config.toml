@@ -1,0 +1,5 @@
+[client]
+showErrorDetails="type"
+
+[theme]
+base="dark"
