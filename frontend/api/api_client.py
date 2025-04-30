@@ -125,7 +125,6 @@ class APIClient:
             self.logger.success(f"[MESSAGE] User message sent successfully")
             message_pair = response.json()
         except requests.RequestException:
-            print(response.json())
             self.logger.exception(f"[MESSAGE] Error on sending user message:")
             message_pair = {
                 "thread": thread_id,
