@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class Thread(BaseModel):
-    id: str
+    id: uuid.UUID
     account: int
     created_at: datetime
 
@@ -16,7 +16,7 @@ class UserMessage(BaseModel):
     content: str
 
 class ChartData(BaseModel):
-    data: dict[str, list[Any]] | None = Field(description="Preprocessed data", default=None)
+    data: list[dict[str, Any]] | None = Field(description="Preprocessed data", default=None)
     reasoning: str | None = Field(description="Brief explanation of how the query results were processed, including any assumptions made, conflicts resolved, or placeholders used", default=None)
 
 class ChartMetadata(BaseModel):
@@ -44,8 +44,8 @@ class Chart(BaseModel):
     is_valid: bool
 
 class MessagePair(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    thread: str
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    thread: uuid.UUID
     model_uri: str
     user_message: str
     assistant_message: str

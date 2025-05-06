@@ -1,4 +1,5 @@
 from datetime import datetime
+from uuid import UUID
 
 import pandas as pd
 import plotly.express as px
@@ -67,7 +68,7 @@ class ChatPage:
     def _handle_send_feedback(
         self,
         feedback_id: str,
-        message_pair_id: str,
+        message_pair_id: UUID,
         show_comments_id: str,
         comments: str
     ):
@@ -75,7 +76,7 @@ class ChatPage:
 
         Args:
             feedback_id (str): The feedback id
-            message_pair_id (str): The message pair id
+            message_pair_id (UUID): The message pair id
             show_comments_id (str): The show_comments flag id
             comments (str): The comments
         """
@@ -341,7 +342,7 @@ class ChatPage:
 
         for message_pair in chat_history:
             for k, v in st.session_state.items():
-                if message_pair.id in k:
+                if str(message_pair.id) in k:
                     del st.session_state[k]
 
         del st.session_state[self.page_name]

@@ -1,4 +1,5 @@
 import requests
+from uuid import UUID
 
 from frontend.datatypes import MessagePair, Thread, UserMessage
 from frontend.loguru_logging import get_logger
@@ -67,14 +68,14 @@ class APIClient:
 
         return access_token, message
 
-    def create_thread(self, access_token: str) -> str|None:
+    def create_thread(self, access_token: str) -> UUID|None:
         """Create a thread
 
         Args:
             access_token (str): User access token
 
         Returns:
-            str|None: Thread unique identifier if the thread was created successfully. None otherwise
+            UUID|None: Thread unique identifier if the thread was created successfully. None otherwise
         """
         self.logger.info("[THREAD] Creating thread")
 
@@ -91,19 +92,19 @@ class APIClient:
             self.logger.exception(f"[MESSAGE] Error on thread creation:")
             return None
 
-    def send_message(self, access_token: str, message: str, thread_id: str) -> MessagePair:
+    def send_message(self, access_token: str, message: str, thread_id: UUID) -> MessagePair:
         """Send a user message
 
         Args:
             access_token (str): User access token
             message (str): User message
-            thread_id (str): Thread unique identifier
+            thread_id (UUID): Thread unique identifier
 
         Returns:
             MessagePair:
                 A MessagePair object containing:
                     - id: unique identifier
-                    - thread_id: thread unique identifier
+                    - thread: thread unique identifier
                     - model_uri: assistant's model URI
                     - user_message: user message
                     - assistant_message: assistant message
@@ -118,7 +119,7 @@ class APIClient:
         try:
             response = requests.post(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
-                json=user_message.model_dump(),
+                json=user_message.model_dump(mode="json"),
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
@@ -136,12 +137,12 @@ class APIClient:
 
         return MessagePair(**message_pair)
 
-    def send_feedback(self, access_token: str, message_pair_id: str, rating: int, comments: str) -> bool:
+    def send_feedback(self, access_token: str, message_pair_id: UUID, rating: int, comments: str) -> bool:
         """Send a feedback
 
         Args:
             access_token (str): User access token
-            message_pair_id (str): The message pair unique identifier
+            message_pair_id (UUID): The message pair unique identifier
             rating (int): The rating (0 or 1)
             comments (str): The comments
 
@@ -168,12 +169,12 @@ class APIClient:
             self.logger.exception(f"[FEEDBACK] Error on sending feedback:")
             return False
 
-    def clear_thread(self, access_token: str, thread_id: str) -> bool:
+    def clear_thread(self, access_token: str, thread_id: UUID) -> bool:
         """Clear a thread
 
         Args:
             access_token (str): User access token
-            thread_id (str): Thread unique identifier
+            thread_id (UUID): Thread unique identifier
 
         Returns:
             bool: Whether the operation succeeded or not
