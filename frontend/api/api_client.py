@@ -1,8 +1,9 @@
-import requests
 from uuid import UUID
 
+import requests
+from loguru import logger
+
 from frontend.datatypes import MessagePair, Thread, UserMessage
-from frontend.loguru_logging import get_logger
 
 ERROR_MESSAGES = {
     "DEFAULT": "Algo deu errado. Por favor, tente novamente mais tarde.",
@@ -24,7 +25,7 @@ def get_error_message(response: requests.Response) -> str:
 class APIClient:
     def __init__(self, base_url: str):
         self.base_url = base_url
-        self.logger = get_logger(self.__class__.__name__)
+        self.logger = logger.bind(classname=self.__class__.__name__)
 
     def authenticate(self, username: str, password: str) -> tuple[str|None, str]:
         """Send a post request to the authentication endpoint

@@ -1,2 +1,2 @@
-from .constants import BASE_URL
+from .constants import *
 from .icons import AVATARS

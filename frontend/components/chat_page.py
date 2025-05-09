@@ -4,12 +4,12 @@ from uuid import UUID
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+from loguru import logger
 from streamlit.delta_generator import DeltaGenerator
 
 from frontend.api import APIClient
 from frontend.components import *
 from frontend.datatypes import MessagePair
-from frontend.loguru_logging import get_logger
 from frontend.utils.icons import AVATARS
 
 
@@ -29,7 +29,7 @@ class ChatPage:
         self.api = api
         self.title = title
         self.page_name = title.lower()
-        self.logger = get_logger(self.__class__.__name__)
+        self.logger = logger.bind(classname=self.__class__.__name__)
 
         st.set_page_config(
             page_title=self.title,
