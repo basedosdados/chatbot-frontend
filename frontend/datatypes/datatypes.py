@@ -3,11 +3,11 @@ import uuid
 from datetime import datetime
 from typing import Any, Iterator, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, UUID4
 
 
 class Thread(BaseModel):
-    id: uuid.UUID
+    id: UUID4
     account: int
     created_at: datetime
 
@@ -44,8 +44,8 @@ class Chart(BaseModel):
     is_valid: bool
 
 class MessagePair(BaseModel):
-    id: uuid.UUID = Field(default_factory=uuid.uuid4)
-    thread: uuid.UUID
+    id: UUID4 = Field(default_factory=uuid.uuid4)
+    thread: UUID4
     model_uri: str
     user_message: str
     assistant_message: str
