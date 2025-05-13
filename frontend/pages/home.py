@@ -1,72 +1,25 @@
 import streamlit as st
 
 
-TABLES = {
-    "Avaliação de Fluência Leitora da PARC": {
-        "description": "Variáveis principais: Ano, Momento Avaliação, Sigla UF, Nome Município, Rede, Localização, Sexo, Raça/Cor, Perfil, Detalhamento Perfil",
-        "link": "https://coda.io/d/_doJyOPr-NIX/Tabelas_suRf37t1#br-fundacao-lemann-alfabetizacao-avaliacao-fluencia-parc-aluno_tu-lkwy3"
-    },
-    "Ideb dos Municípios": {
-        "description": "Variáveis principais: Ano, Município, Sigla UF, Anos Escolares, Taxa Aprovação, Indicador Rendimento, Nota SAEB Matemática, Nota SAEB Língua Portuguesa, Nota SAEB Média Padronizada, Ideb, Programa",
-        "link": "https://coda.io/d/_doJyOPr-NIX/Tabelas_suRf37t1#ideb-municipio-programas-fl_tu6xUAan"
-    },
-    "Ideb das UFs": {
-        "description": "Variáveis principais: Ano, Sigla UF, Anos Escolares, Taxa Aprovação, Indicador Rendimento, Nota SAEB Matemática, Nota SAEB Língua Portuguesa, Nota SAEB Média Padronizada, Ideb, Programa",
-        "link": "https://coda.io/d/_doJyOPr-NIX/Tabelas_suRf37t1#ideb-uf-programas-fl_tukZ-YYg"
-    },
-    "Egressos de Oportunidades de Desenvolvimento de Liderança": {
-        "description": "Variáveis principais: Organização, Programa, Raça, Sexo, UF, Região, Setor, Cargo Padronizado, Instituição, Tema, PAF",
-        "link": "https://coda.io/d/_doJyOPr-NIX/Tabelas_suRf37t1#br-fundacao-lemann-egressos_tuj-dKlq"
-    },
-    "Sinopse Estatística do Censo Escolar - Etapa de Ensino e Série": {
-        "description": "Variáveis principais: Ano, Sigla UF, Município, Rede, Etapa de Ensino, Série, Quantidade de Matrículas",
-        "link": "https://coda.io/d/_doJyOPr-NIX/Tabelas_suRf37t1#sinopse-estatistica-etapa-ensino-serie-programas-fl_tuSX-LEz"
-    },
-    "Sinopse Estatística do Censo Escolar - Etapa e Tempo Integral": {
-        "description": "Variáveis principais: Ano, Sigla UF, Município, Rede, Etapa de Ensino, Tempo de Ensino, Quantidade de Matrículas",
-        "link": "https://coda.io/d/_doJyOPr-NIX/Tabelas_suRf37t1#sinopse-estatistica-tempo-ensino-programas-fl_tuUTtjLa"
-    }
-}
-
-N_TABLES_COLUMNS = 1
-
 # Page config, Title and welcome message
 st.set_page_config(
-    page_title="Assistente BD & FL",
+    page_title="Chatbot BD",
     page_icon="https://api.dicebear.com/9.x/initials/svg?seed=BD&radius=20&backgroundColor=34a853&fontFamily=sans-serif&fontWeight=800",
 )
 
-st.title("Assistente BD & FL")
+st.title("Chatbot BD")
 st.caption("Para consultas em bases de dados utilizando linguagem natural")
 
 st.write("\n")
 
 st.subheader("Bem Vindo(a)! :wave:")
-st.write(f"Bem vindo(a) ao assistente da BD & FL! Ele vai te ajudar a conversar com seus dados! Basta entrar na página de chat no menu à esquerda e começar a conversa. Faça perguntas sobre os dados disponíveis <br/> e o assistente dará o seu melhor para respondê-las!", unsafe_allow_html=True)
+st.write(f"Bem vindo(a) ao assistente da BD & FL! Ele vai te ajudar a conversar com seus dados! Basta entrar na página de chat no menu à esquerda e começar a conversa. Faça perguntas sobre os dados disponíveis <br/> e o chatbot dará o seu melhor para respondê-las!", unsafe_allow_html=True)
 
 st.write("\n")
 
 # Available models
 st.subheader("Modelo :brain:")
-st.write("O modelo por trás do assistente é o GPT-4o, da OpenAI.")
-
-st.write("\n")
-
-# Available tables
-st.subheader("Tabelas :card_index_dividers:")
-st.write("As tabelas disponíveis para consulta são as seguintes:")
-
-columns = {
-    col_num: col for col_num, col in enumerate(st.columns(N_TABLES_COLUMNS))
-}
-
-for i, (table_name, table_info) in enumerate(TABLES.items()):
-    col = columns[i%N_TABLES_COLUMNS]
-    description = table_info["description"]
-    link = table_info["link"]
-    with col.expander(f":blue[{table_name}]"):
-        st.write(description)
-        st.write(f"[Documentação]({link})")
+st.write("O modelo por trás do assistente é o Gemini, do Google.")
 
 st.write("\n")
 
