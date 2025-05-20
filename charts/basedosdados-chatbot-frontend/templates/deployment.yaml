@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ .Values.chatbot-frontend.name }}
+  name: {{ .Values.chatbotFrontend.name }}
   labels:
     app.kubernetes.io/component: basedosdados-chatbot-frontend
-    app.kubernetes.io/name: {{ .Values.chatbot-frontend.name }}
+    app.kubernetes.io/name: {{ .Values.chatbotFrontend.name }}
   annotations:
     rollme: {{ randAlphaNum 5 | quote }}
 spec:
-  replicas: {{ .Values.chatbot-frontend.replicas }}
+  replicas: {{ .Values.chatbotFrontend.replicas }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -17,27 +17,27 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/component: basedosdados-chatbot-frontend
-      app.kubernetes.io/name: {{ .Values.chatbot-frontend.name }}
+      app.kubernetes.io/name: {{ .Values.chatbotFrontend.name }}
   minReadySeconds: 5
   template:
     metadata:
       labels:
         app.kubernetes.io/component: basedosdados-chatbot-frontend
-        app.kubernetes.io/name: {{ .Values.chatbot-frontend.name }}
+        app.kubernetes.io/name: {{ .Values.chatbotFrontend.name }}
       annotations:
         rollme: {{ randAlphaNum 5 | quote }}
     spec:
       containers:
         - name: basedosdados-chatbot-frontend
-          image: "{{ .Values.chatbot-frontend.image.name }}:{{ .Values.chatbot-frontend.image.tag }}"
-          imagePullPolicy: {{ .Values.chatbot-frontend.image.pullPolicy }}
+          image: "{{ .Values.chatbotFrontend.image.name }}:{{ .Values.chatbotFrontend.image.tag }}"
+          imagePullPolicy: {{ .Values.chatbotFrontend.image.pullPolicy }}
           ports:
             - name: streamlit
               containerPort: 8501
           volumeMounts:
             - name: chatbot-log-volume
               mountPath: /var/log/chatbot
-          {{- with .Values.chatbot-frontend.resources }}
+          {{- with .Values.chatbotFrontend.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}

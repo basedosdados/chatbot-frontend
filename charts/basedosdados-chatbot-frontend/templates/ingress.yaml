@@ -1,13 +1,13 @@
-{{- if .Values.ingress.enabled }}
+{{- if .Values.chatbotFrontend.ingress.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: "{{ .Values.chatbot-frontend.name }}-ingress"
+  name: "{{ .Values.chatbotFrontend.name }}-ingress"
   labels:
     app.kubernetes.io/component: basedosdados-chatbot-frontend
-    app.kubernetes.io/name: {{ .Values.chatbot-frontend.name }}
+    app.kubernetes.io/name: {{ .Values.chatbotFrontend.name }}
   annotations:
-    {{- with .Values.chatbot-frontend.ingress.annotations }}
+    {{- with .Values.chatbotFrontend.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
@@ -19,10 +19,10 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: "{{ .Values.chatbot-frontend.name }}-service"
+                name: "{{ .Values.chatbotFrontend.name }}-service"
                 port:
                   number: 80
-  {{- with .Values.chatbot-frontend.ingress.tls }}
+  {{- with .Values.chatbotFrontend.ingress.tls }}
   tls:
     {{- toYaml . | nindent 4 }}
   {{- end }}
