@@ -34,6 +34,9 @@ spec:
           ports:
             - name: streamlit
               containerPort: 8501
+          volumeMounts:
+            - name: chatbot-log-volume
+              mountPath: /var/log/chatbot
           {{- with .Values.chatbot-frontend.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -44,4 +47,9 @@ spec:
               port: 8501
             initialDelaySeconds: 5
             periodSeconds: 10
+      # TODO: use persistent volume
+      volumes:
+        - name: chatbot-log-volume
+          emptyDir:
+            sizeLimit: 500Mi
       restartPolicy: Always
