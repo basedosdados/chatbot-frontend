@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.chatbot-frontend.name }}
+  labels:
+    app.kubernetes.io/component: basedosdados-chatbot-frontend
+    app.kubernetes.io/name: {{ .Values.chatbot-frontend.name }}
+  annotations:
+    rollme: {{ randAlphaNum 5 | quote }}
+spec:
+  replicas: {{ .Values.chatbot-frontend.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 50%
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: basedosdados-chatbot-frontend
+      app.kubernetes.io/name: {{ .Values.chatbot-frontend.name }}
+  minReadySeconds: 5
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: basedosdados-chatbot-frontend
+        app.kubernetes.io/name: {{ .Values.chatbot-frontend.name }}
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+    spec:
+      containers:
+        - name: basedosdados-chatbot-frontend
+          image: "{{ .Values.chatbot-frontend.image.name }}:{{ .Values.chatbot-frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.chatbot-frontend.image.pullPolicy }}
+          ports:
+            - name: streamlit
+              containerPort: 8501
+          volumeMounts:
+            - name: chatbot-log-volume
+              mountPath: /var/log/chatbot
+          {{- with .Values.chatbot-frontend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /chatbot
+              port: 8501
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      # TODO: use persistent volume
+      volumes:
+        - name: chatbot-log-volume
+          emptyDir:
+            sizeLimit: 500Mi
+      restartPolicy: Always
