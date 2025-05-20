@@ -53,7 +53,7 @@ jobs:
       - name: Write values.yaml file
         run: |
           cat << EOF > values.yaml
-          chatbot-frontend:
+          chatbotFrontend:
             name: basedosdados-chatbot-frontend-dev
             image:
               name: ghcr.io/${{ github.repository }}
