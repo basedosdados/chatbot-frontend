@@ -13,7 +13,7 @@ st.caption("Para consultas em bases de dados utilizando linguagem natural")
 st.write("\n")
 
 st.subheader("Bem Vindo(a)! :wave:")
-st.write(f"Bem vindo(a) ao chatbot da BD! Ele vai te ajudar a conversar com seus dados! Basta entrar na página de chat no menu à esquerda e começar a conversa. Faça perguntas sobre os dados disponíveis <br/> e o chatbot dará o seu melhor para respondê-las!", unsafe_allow_html=True)
+st.write(f"Bem vindo(a) ao chatbot da BD! Ele vai te ajudar a conversar com seus dados! Basta entrar na página de chat no menu à esquerda e começar a conversa. Faça perguntas sobre os dados disponíveis e o chatbot dará o seu melhor para respondê-las!", unsafe_allow_html=True)
 
 st.write("\n")
 
@@ -39,7 +39,7 @@ st.subheader("Guia de Prompt :clipboard:")
 st.write("A forma como você conversa com o chatbot pode influenciar na qualidade das respostas! Por isso, abaixo estão listadas algumas dicas para te ajudar a elaborar suas perguntas. Elas podem ser úteis caso as respostas fornecidas estejam incorretas ou não sejam boas o suficiente!")
 st.write("""
          1. Tente fazer uma pergunta por vez. Caso sua pergunta seja muito complexa, ou talvez seja um conjunto de várias perguntas, tente separá-la em perguntas menores e mais simples.
-         2. Tente utilizar termos como "**por**" ou "**total**" quando precisar de informações agregadas segundo alguma variável. Por exemplo, se quiser saber a porcentagem de estudantes leitores **por** raça ou o **total** de matrículas em um ano específico.
+         2. Tente utilizar termos como "**por**" ou "**total**" quando precisar de informações agregadas segundo alguma variável.
          3. Caso saiba os nomes das colunas das tabelas, tente mencioná-los nas suas perguntas. Por exemplo, se você sabe que uma tabela possui a coluna "**município**", tente usar a palavra **município** ao invés de "cidade". Isso não significa que você não possa usar palavras parecidas, mas usar os nomes das colunas ajuda o chatbot.
          4. Caso o chatbot não esteja encontrando uma resposta para a sua pergunta e você saiba em qual tabela estão os dados necessários para respondê-la, você pode tentar pedir explicitamente ao chatbot para procurar nessa tabela específica.""")
 
