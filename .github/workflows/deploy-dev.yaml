@@ -1,4 +1,4 @@
-name: Release Development Docker Container
+name: Deploy Development Docker Container
 
 on:
   workflow_run:
@@ -8,11 +8,11 @@ on:
       - dev
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   deploy-dev:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    name: Deploy dev docker container
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment:
       name: development
