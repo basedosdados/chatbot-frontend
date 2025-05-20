@@ -1,5 +1,7 @@
 # API variables
-BASE_URL = "http://localhost:8000" # Base API URL
+API_HOST = "api-development-service"
+API_PORT = 80
+BASE_URL = f"http://{API_HOST}:{API_PORT}" # Base API URL
 
 # Log configuration variables
 LOG_FILE_PATH = "/var/log/chatbot/frontend.log"
