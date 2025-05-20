@@ -56,7 +56,7 @@ jobs:
           chatbot-frontend:
             name: basedosdados-chatbot-frontend-dev
             image:
-              name: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
+              name: ghcr.io/${{ github.repository }}
               tag: dev
               pullPolicy: Always
             replicas: 1
