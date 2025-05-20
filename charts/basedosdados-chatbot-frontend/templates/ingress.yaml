@@ -15,7 +15,7 @@ spec:
     - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
-          - path: /
+          - path: /chatbot(/|$)(.*)
             pathType: Prefix
             backend:
               service:

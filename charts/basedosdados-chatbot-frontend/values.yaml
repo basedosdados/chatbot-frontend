@@ -6,7 +6,7 @@ chatbot-frontend:
   # Deployment image
   image:
     name: ghcr.io/basedosdados/chatbot-frontend
-    tag: stable  # We use the stable tag for the API as a default
+    tag: stable
     pullPolicy: Always
 
   # Number of replicas
@@ -27,16 +27,17 @@ chatbot-frontend:
     enabled: true
 
     # Host to be used in the ingress
-    host: chatbot.basedosdados.org
+    host: ""
 
     # Ingress annotations
     annotations:
       kubernetes.io/ingress.class: nginx
-      nginx.ingress.kubernetes.io/rewrite-target: /
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+      nginx.ingress.kubernetes.io/use-regex: true
       nginx.ingress.kubernetes.io/ssl-redirect: true
       cert-manager.io/issuer: letsencrypt-production
     # TLS configuration
     tls:
       - hosts:
-          - chatbot.basedosdados.org
-        secretName: ?
+          - ""
+        secretName: ""

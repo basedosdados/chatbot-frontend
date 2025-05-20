@@ -1,5 +1,11 @@
+[browser]
+gatherUsageStats=false
+
 [client]
 showErrorDetails="type"
+
+[server]
+baseUrlPath="/chatbot"
 
 [theme]
 base="dark"
