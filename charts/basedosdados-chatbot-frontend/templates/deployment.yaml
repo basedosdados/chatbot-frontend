@@ -40,7 +40,7 @@ spec:
           {{- end }}
           readinessProbe:
             httpGet:
-              path: /
+              path: /chatbot
               port: 8501
             initialDelaySeconds: 5
             periodSeconds: 10
