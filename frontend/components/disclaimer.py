@@ -16,7 +16,7 @@ def render_disclaimer():
                     }
                 </style>
                 <div class="disclaimer">
-                    O assistente pode cometer erros. Considere verificar informações importantes.<br/>
+                    O chatbot pode cometer erros. Considere verificar informações importantes.<br/>
                     Todas as informações aqui enviadas são registradas para análise e melhoria do produto.
                 </div>
             """,

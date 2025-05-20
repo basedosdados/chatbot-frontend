@@ -19,12 +19,6 @@ class ChatPage:
     feedbacks_key = "feedbacks"
     waiting_key = "waiting_for_answer"
 
-    example_prompts = [
-        {"icon": "auto_stories", "text": "Qual foi a porcentagem de alunos leitores por raça/cor nas avaliações de saída de 2023?"},
-        {"icon": "auto_stories", "text": "Qual foi o ideb médio em 2023 nos municípios onde temos EpV para os anos iniciais?"},
-        {"icon": "school", "text": "Qual a porcentagem de egressos que ocupam posições de autoridade formal, por organização?"},
-    ]
-
     def __init__(self, api: APIClient, title: str):
         self.api = api
         self.title = title
@@ -379,15 +373,6 @@ class ChatPage:
 
     def render(self):
         """Render the chat page"""
-        # Show three example prompts
-        columns = st.columns(3)
-        for col, example in zip(columns, self.example_prompts):
-            with col:
-                render_card(
-                    icon=example["icon"],
-                    text=example["text"],
-                )
-
         # Unfortunately, this is necessary for the code-showing button customization
         st.markdown(
             """<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>""",

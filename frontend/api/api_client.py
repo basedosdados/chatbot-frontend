@@ -5,22 +5,6 @@ from loguru import logger
 
 from frontend.datatypes import MessagePair, Thread, UserMessage
 
-ERROR_MESSAGES = {
-    "DEFAULT": "Algo deu errado. Por favor, tente novamente mais tarde.",
-    "USERNAME_TAKEN": "O usuário escolhido está indisponível.",
-    "ALREADY_VERIFIED": "O email fornecido já está verificado.",
-    "TOKEN_EXPIRED": "O link de verificação expirou. Por favor, realize o cadastro novamente.",
-    "TOKEN_NOT_FOUND": "Token de verificação não encontrado. Por favor, realize o cadastro novamente.",
-    "USER_NOT_FOUND": "Usuário não encontrado. Por favor, realize o cadastro novamente.",
-}
-
-def get_error_message(response: requests.Response) -> str:
-    error_detail = response.json().get("detail")
-
-    if isinstance(error_detail, dict):
-        error_code = error_detail.get("code", "DEFAULT")
-
-    return ERROR_MESSAGES[error_code]
 
 class APIClient:
     def __init__(self, base_url: str):
