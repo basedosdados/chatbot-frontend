@@ -1,5 +1,5 @@
 # Chatbot Frontend configuration
-chatbot-frontend:
+chatbotFrontend:
   # Deployment name
   name: basedosdados-chatbot-frontend
 
