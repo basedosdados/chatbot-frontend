@@ -52,7 +52,7 @@ jobs:
 
       - name: Write values.yaml file
         run: |
-          cat << "EOF" > values.yaml
+          cat << 'EOF' > values.yaml
           chatbotFrontend:
             name: basedosdados-chatbot-frontend-dev
             image:
