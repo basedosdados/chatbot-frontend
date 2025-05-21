@@ -11,11 +11,11 @@ class APIClient:
         self.base_url = base_url
         self.logger = logger.bind(classname=self.__class__.__name__)
 
-    def authenticate(self, username: str, password: str) -> tuple[str|None, str]:
+    def authenticate(self, email: str, password: str) -> tuple[str|None, str]:
         """Send a post request to the authentication endpoint
 
         Args:
-            username (str): The username
+            email (str): The email
             password (str): The password
 
         Returns:
@@ -29,7 +29,7 @@ class APIClient:
             response = requests.post(
                 url=f"{self.base_url}/chatbot/token/",
                 data={
-                    "email": username,
+                    "email": email,
                     "password": password
                 }
             )

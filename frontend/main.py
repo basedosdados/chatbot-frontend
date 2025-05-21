@@ -49,19 +49,19 @@ def login():
     api = APIClient(BASE_URL)
 
     st.title("Entrar")
-    st.caption("Por favor, insira seu usuário e senha para continuar")
+    st.caption("Por favor, insira seu email e senha para continuar")
 
     access_token = None
     message = None
 
     with st.form("register_form"):
-        username = st.text_input("Usuário")
+        email = st.text_input("Email")
         password = st.text_input("Senha", type="password")
 
         col1, col2, _ = st.columns([1.1, 1.5, 6.86])
 
         if col1.form_submit_button("Entrar", type="primary"):
-            access_token, message = api.authenticate(username, password)
+            access_token, message = api.authenticate(email, password)
 
     if access_token is not None:
         st.session_state["logged_in"] = True
