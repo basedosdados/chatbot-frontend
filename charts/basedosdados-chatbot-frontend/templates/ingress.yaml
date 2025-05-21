@@ -11,12 +11,13 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
+  ingressClassName: nginx
   rules:
     - host: {{ .Values.chatbotFrontend.ingress.host | quote }}
       http:
         paths:
           - path: /chatbot(/|$)(.*)
-            pathType: Prefix
+            pathType: ImplementationSpecific
             backend:
               service:
                 name: "{{ .Values.chatbotFrontend.name }}-service"
