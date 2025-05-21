@@ -41,11 +41,17 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: 8501
+            initialDelaySeconds: 10
+            periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /chatbot
+              path: /_stcore/health
               port: 8501
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
       # TODO: use persistent volume
       volumes:
