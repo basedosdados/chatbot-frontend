@@ -1,5 +1,4 @@
-from datetime import datetime
-from uuid import UUID
+import uuid
 
 import pandas as pd
 import plotly.express as px
@@ -19,16 +18,26 @@ class ChatPage:
     feedbacks_key = "feedbacks"
     waiting_key = "waiting_for_answer"
 
-    def __init__(self, api: APIClient, title: str):
+    def __init__(self, api: APIClient, title: str | None = None, thread_id: str | None = None):
         self.api = api
         self.title = title
-        self.page_name = title.lower()
+        self.thread_id = thread_id
+        self.page_id = str(uuid.uuid4())
         self.logger = logger.bind(classname=self.__class__.__name__)
 
-        st.set_page_config(
-            page_title=self.title,
-            page_icon=AVATARS["assistant"]
+    def _create_thread_and_register(self, title: str|None = None):
+        thread_id, thread_title = self.api.create_thread(
+            access_token=st.session_state["access_token"],
+            title=title,
         )
+
+        if thread_id is not None:
+            self.title = thread_title
+            self.thread_id = thread_id
+            st.session_state["current_chat_id"] = self.thread_id
+            st.session_state["conversations"][self.thread_id] = self
+        else:
+            show_error_popup("Não foi possível criar a thread.")
 
     def _handle_click_feedback(self, feedback_id: str, show_comments_id: str):
         """Update the feedback buttons state and the comments text input flag on session state
@@ -39,7 +48,7 @@ class ChatPage:
         """
         feedback = st.session_state[feedback_id]
 
-        page_feedbacks = st.session_state[self.page_name][self.feedbacks_key]
+        page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
 
         # The _handle_click_feedback method is being called sometimes when changing
         # pages and then coming back, so some guard clauses had to be used
@@ -62,7 +71,7 @@ class ChatPage:
     def _handle_send_feedback(
         self,
         feedback_id: str,
-        message_pair_id: UUID,
+        message_pair_id: uuid.UUID,
         show_comments_id: str,
         comments: str
     ):
@@ -174,7 +183,7 @@ class ChatPage:
 
         # Checks if the model is still answering the last question.
         # If yes, all message buttons and comments inputs will be disabled
-        waiting_for_answer = st.session_state[self.page_name][self.waiting_key]
+        waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
 
         # Unique flag and button key for chart-showing
         show_chart_id = f"show_chart_{message_pair.id}"
@@ -204,7 +213,7 @@ class ChatPage:
             st.session_state[show_comments_id] = False
 
         # Look for the feedback buttons widget in the session state
-        page_feedbacks = st.session_state[self.page_name][self.feedbacks_key]
+        page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
 
         # And keep its state if it already existed in the session
         if feedback_id in page_feedbacks:
@@ -288,88 +297,12 @@ class ChatPage:
                 disabled=waiting_for_answer
             )
 
-    def _chat_to_csv(self) -> bytes:
-        """Create a csv file containing the chat history questions and answers
-
-        Returns:
-            bytes: The utf-8 encoded csv file
-        """
-        page_session_state = st.session_state[self.page_name]
-        chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
-
-        models = []
-        user_messages = []
-        assistant_messages = []
-        generated_queries = []
-
-        for message_pair in chat_history:
-            models.append(message_pair.model_uri)
-            user_messages.append(message_pair.user_message)
-            assistant_messages.append(message_pair.assistant_message)
-
-            if message_pair.generated_queries is not None:
-                queries = "\n\n".join(message_pair.generated_queries)
-            else:
-                queries = None
-
-            generated_queries.append(queries)
-
-        return pd.DataFrame({
-            "modelo": models,
-            "pergunta": user_messages,
-            "resposta": assistant_messages,
-            "consulta": generated_queries,
-        }).to_csv(index=False).encode("utf-8")
-
-    def _reset_page(self):
-        """Reset the page session state and delete everything related to its
-        chat history from the app session state. Also clears the assistant memory
-        """
-        page_session_state = st.session_state[self.page_name]
-
-        _ = self.api.clear_thread(
-            access_token=st.session_state["access_token"],
-            thread_id=page_session_state["thread_id"]
-        )
-
-        chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
-
-        for message_pair in chat_history:
-            for k, v in st.session_state.items():
-                if str(message_pair.id) in k:
-                    del st.session_state[k]
-
-        del st.session_state[self.page_name]
-
     def _handle_user_interaction(self):
         """Disable all chat message buttons, comments inputs and the chat input while the model
         is answering a question and enable the chat reset and download buttons rendering
         """
-        st.session_state[self.page_name][self.chat_buttons_key] = False
-        st.session_state[self.page_name][self.waiting_key] = True
-
-    def _render_chat_buttons(self):
-        """Render the chat reset and download buttons"""
-        page_session_state = st.session_state[self.page_name]
-        chat_reset_disabled = page_session_state[self.chat_buttons_key]
-
-        if chat_reset_disabled:
-            return
-
-        container = st.container()
-
-        col1, col2, _ = container.columns((1, 1, 13))
-
-        col1.button(
-            ":material/refresh:",
-            on_click=self._reset_page,
-        )
-
-        col2.download_button(
-            ":material/download:",
-            data=self._chat_to_csv(),
-            file_name=f"{self.page_name.replace(' ', '_')}_{datetime.now().strftime('%F_%T')}.csv"
-        )
+        st.session_state[self.page_id][self.chat_buttons_key] = False
+        st.session_state[self.page_id][self.waiting_key] = True
 
     def render(self):
         """Render the chat page"""
@@ -383,20 +316,10 @@ class ChatPage:
         subheader = st.empty()
 
         # Initialize page session state
-        if self.page_name not in st.session_state:
-            st.session_state[self.page_name] = {}
+        if self.page_id not in st.session_state:
+            st.session_state[self.page_id] = {}
 
-        page_session_state = st.session_state[self.page_name]
-
-        # Get thread id
-        if "thread_id" not in page_session_state:
-            thread_id = self.api.create_thread(
-                access_token=st.session_state["access_token"]
-            )
-            if thread_id is not None:
-                page_session_state["thread_id"] = thread_id
-            else:
-                show_error_popup("Não foi possível criar a thread.")
+        page_session_state = st.session_state[self.page_id]
 
         # Initialize the waiting key, which is used to prevent users from
         # interacting with the app while the model is answering a question
@@ -405,7 +328,15 @@ class ChatPage:
 
         # Initialize chat history state
         if self.chat_history_key not in page_session_state:
-            page_session_state[self.chat_history_key] = []
+            if self.thread_id is not None:
+                message_pairs = self.api.get_message_pairs(
+                    access_token=st.session_state["access_token"],
+                    thread_id=self.thread_id
+                )
+            else:
+                message_pairs = []
+
+            page_session_state[self.chat_history_key] = message_pairs or []
 
         # Initialize feedback history
         if self.feedbacks_key not in page_session_state:
@@ -452,10 +383,14 @@ class ChatPage:
                 with three_dots_placeholder:
                     three_pulsing_dots()
 
+                # Create thread only in the first message
+                if self.thread_id is None:
+                    self._create_thread_and_register(title=user_prompt)
+
                 message_pair = self.api.send_message(
                     access_token=st.session_state["access_token"],
                     message=user_prompt,
-                    thread_id=page_session_state["thread_id"]
+                    thread_id=self.thread_id
                 )
 
                 three_dots_placeholder.empty()
@@ -467,9 +402,6 @@ class ChatPage:
 
             # Add message pair to chat history
             chat_history.append(message_pair)
-
-        # Render the chat buttons
-        self._render_chat_buttons()
 
         # Render the disclaimer messages
         render_disclaimer()

@@ -53,7 +53,7 @@ class APIClient:
 
         return access_token, message
 
-    def create_thread(self, access_token: str) -> UUID|None:
+    def create_thread(self, access_token: str, title: str|None = None) -> tuple[UUID, str]|None:
         """Create a thread
 
         Args:
@@ -67,14 +67,45 @@ class APIClient:
         try:
             response = requests.post(
                 url=f"{self.base_url}/chatbot/threads/",
-                headers={"Authorization": f"Bearer {access_token}"}
+                json={"title": title},
+                headers={"Authorization": f"Bearer {access_token}"},
             )
             response.raise_for_status()
             thread = Thread(**response.json())
-            self.logger.success(f"[MESSAGE] Thread created successfully for user {thread.id}")
-            return thread.id
+            self.logger.success(f"[THREAD] Thread created successfully for user {thread.account}")
+            return thread.id, thread.title
         except requests.RequestException:
-            self.logger.exception(f"[MESSAGE] Error on thread creation:")
+            self.logger.exception(f"[THREAD] Error on thread creation:")
+            return None
+
+    def get_threads(self, access_token: str) -> list[Thread]|None:
+        self.logger.info("[THREAD] Retrieving threads")
+        try:
+            response = requests.get(
+                url=f"{self.base_url}/chatbot/threads/",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            response.raise_for_status()
+            threads = [Thread(**thread) for thread in response.json()]
+            self.logger.success(f"[THREAD] Threads retrieved successfully")
+            return threads
+        except requests.RequestException:
+            self.logger.exception(f"[THREAD] Error on threads retrieval:")
+            return None
+
+    def get_message_pairs(self, access_token: str, thread_id: UUID) -> list[MessagePair]|None:
+        self.logger.info(f"[MESSAGE] Retrieving message pairs for thread {thread_id}")
+        try:
+            response = requests.get(
+                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            response.raise_for_status()
+            message_pairs = [MessagePair(**pair) for pair in response.json()]
+            self.logger.success(f"[MESSAGE] Message pairs retrived successfully for thread {thread_id}")
+            return message_pairs
+        except requests.RequestException:
+            self.logger.exception(f"[MESSAGE] Error on message pairs retrieval for thread {thread_id}:")
             return None
 
     def send_message(self, access_token: str, message: str, thread_id: UUID) -> MessagePair:
@@ -102,6 +133,12 @@ class APIClient:
         self.logger.info(f"[MESSAGE] Sending message {user_message.id} in thread {thread_id}")
 
         try:
+            # message_pair = {
+            #     "thread": thread_id,
+            #     "model_uri": "",
+            #     "user_message": user_message.content,
+            #     "assistant_message": f"Eco: {user_message.content}"
+            # }
             response = requests.post(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
                 json=user_message.model_dump(mode="json"),
