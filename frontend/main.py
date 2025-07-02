@@ -90,19 +90,19 @@ def render_login():
             access_token, message = api.authenticate(email, password)
 
     if access_token is not None:
-        st.session_state["email"] = email
-        st.session_state["logged_in"] = True
-        st.session_state["access_token"] = access_token
-
         threads = api.get_threads(access_token)
 
         if threads is not None:
             st.session_state["conversations"] = OrderedDict({
                 thread.id: ChatPage(api, title=thread.title, thread_id=str(thread.id))
-                for thread in threads
+                for thread in threads if not thread.deleted
             })
         else:
             st.session_state["conversations"] = OrderedDict()
+
+        st.session_state["email"] = email
+        st.session_state["logged_in"] = True
+        st.session_state["access_token"] = access_token
 
         st.success(message, icon=":material/check:")
         time.sleep(0.5)
@@ -120,10 +120,10 @@ def render_sidebar():
         st.markdown("") # just for spacing
         st.button("Home", icon=":material/home:", on_click=show_home)
         st.button("Logout", icon=":material/logout:", on_click=st.session_state.clear)
-        st.button("Nova conversa", icon=":material/add:", on_click=set_current_chat_id, args=(None,))
         st.divider()
 
         st.subheader(":gray[Suas conversas]")
+        st.button("Nova conversa", icon=":material/add:", on_click=set_current_chat_id, args=(None,))
 
         conversations: OrderedDict[uuid.UUID, ChatPage] = st.session_state["conversations"]
 

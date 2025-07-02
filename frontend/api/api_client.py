@@ -133,12 +133,6 @@ class APIClient:
         self.logger.info(f"[MESSAGE] Sending message {user_message.id} in thread {thread_id}")
 
         try:
-            # message_pair = {
-            #     "thread": thread_id,
-            #     "model_uri": "",
-            #     "user_message": user_message.content,
-            #     "assistant_message": f"Eco: {user_message.content}"
-            # }
             response = requests.post(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
                 json=user_message.model_dump(mode="json"),
