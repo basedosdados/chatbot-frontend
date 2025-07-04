@@ -97,7 +97,7 @@ class APIClient:
         self.logger.info(f"[MESSAGE] Retrieving message pairs for thread {thread_id}")
         try:
             response = requests.get(
-                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
+                url=f"{self.base_url}/chatbot/threads/{thread_id}/",
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
