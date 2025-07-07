@@ -81,7 +81,7 @@ def render_login():
     message = None
 
     with st.form("register_form"):
-        email = st.text_input("Email")
+        email = st.text_input("E-mail")
         password = st.text_input("Senha", type="password")
 
         col1, col2, _ = st.columns([1.1, 1.5, 6.86])
