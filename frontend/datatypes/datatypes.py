@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, UUID4
 class Thread(BaseModel):
     id: UUID4
     account: int
-    title: str
+    title: str|None
     created_at: datetime
     deleted: bool
 

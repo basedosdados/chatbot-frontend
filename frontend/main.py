@@ -131,7 +131,9 @@ def render_sidebar():
             col1, col2 = st.columns([4.1, 1])
 
             with col1:
-                if len(chat_page.title) <= 24:
+                if chat_page.title is None:
+                    label = chat_page.thread_id
+                elif len(chat_page.title) <= 24:
                     label = chat_page.title
                 else:
                     label = chat_page.title[:21].strip() + "..."
