@@ -49,12 +49,12 @@ def _setup_logger():
 
 _setup_logger()
 
-api = APIClient(BASE_URL)
-
 st.set_page_config(
     page_title="Chatbot BD",
     page_icon=AVATARS["assistant"]
 )
+
+api = APIClient(BASE_URL)
 
 if "logged_in" not in st.session_state:
     st.session_state["logged_in"] = False
@@ -75,7 +75,7 @@ def delete_chat(chat_id: uuid.UUID):
 
 def render_login():
     st.title("Entrar")
-    st.caption("Por favor, insira seu email e senha para continuar")
+    st.caption("Por favor, insira seu e-mail e senha para continuar")
 
     access_token = None
     message = None
@@ -128,13 +128,13 @@ def render_sidebar():
         conversations: OrderedDict[uuid.UUID, ChatPage] = st.session_state["conversations"]
 
         for chat_id, chat_page in reversed(conversations.items()):
-            col1, col2 = st.columns([3, 1])
+            col1, col2 = st.columns([4.1, 1])
 
             with col1:
-                if len(chat_page.title) < 25:
+                if len(chat_page.title) <= 24:
                     label = chat_page.title
                 else:
-                    label = chat_page.title[:22].strip() + "..."
+                    label = chat_page.title[:21].strip() + "..."
 
                 st.button(
                     label=label,
@@ -207,12 +207,12 @@ def render_home_page():
             - Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.
             - Após sair da aplicação ou fechá-la, o histórico de conversa e a memória do chatbot serão deletados.""")
 
-if st.session_state["logged_in"]:
+if not st.session_state["logged_in"]:
+    render_login()
+else:
     if st.session_state["show_home"]:
         render_home_page()
         st.session_state["show_home"] = False
     else:
         render_chat_page()
     render_sidebar()
-else:
-    render_login()
