@@ -92,6 +92,7 @@ class APIClient:
         try:
             response = requests.get(
                 url=f"{self.base_url}/chatbot/threads/",
+                params={"order_by": "created_at"},
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
@@ -107,6 +108,7 @@ class APIClient:
         try:
             response = requests.get(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
+                params={"order_by": "created_at"},
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
