@@ -26,14 +26,14 @@ class ChatPage:
         self.logger = logger.bind(classname=self.__class__.__name__)
 
     def _create_thread_and_register(self, title: str|None = None):
-        thread_id, thread_title = self.api.create_thread(
+        thread = self.api.create_thread(
             access_token=st.session_state["access_token"],
             title=title,
         )
 
-        if thread_id is not None:
-            self.title = thread_title
-            self.thread_id = thread_id
+        if thread is not None:
+            self.title = thread.title
+            self.thread_id = thread.id
             st.session_state["current_chat_id"] = self.thread_id
             st.session_state["conversations"][self.thread_id] = self
         else:

@@ -12,14 +12,14 @@ class APIClient:
         self.logger = logger.bind(classname=self.__class__.__name__)
 
     def authenticate(self, email: str, password: str) -> tuple[str|None, str]:
-        """Send a post request to the authentication endpoint
+        """Send a post request to the authentication endpoint.
 
         Args:
-            email (str): The email
-            password (str): The password
+            email (str): The email.
+            password (str): The password.
 
         Returns:
-            tuple[str|None, str]: A tuple containing the access token and a status message
+            tuple[str|None, str]: A tuple containing the access token and a status message.
         """
         access_token = None
 
@@ -53,14 +53,15 @@ class APIClient:
 
         return access_token, message
 
-    def create_thread(self, access_token: str, title: str|None = None) -> tuple[UUID, str]|None:
-        """Create a thread
+    def create_thread(self, access_token: str, title: str|None = None) -> Thread|None:
+        """Create a thread.
 
         Args:
-            access_token (str): User access token
+            access_token (str): User access token.
+            title (str | None, optional): The thread title. Defaults to None.
 
         Returns:
-            UUID|None: Thread unique identifier if the thread was created successfully. None otherwise
+            Thread|None: A Thread object if the thread was created successfully. None otherwise.
         """
         self.logger.info("[THREAD] Creating thread")
 
@@ -73,12 +74,20 @@ class APIClient:
             response.raise_for_status()
             thread = Thread(**response.json())
             self.logger.success(f"[THREAD] Thread created successfully for user {thread.account}")
-            return thread.id, thread.title
+            return thread
         except requests.RequestException:
             self.logger.exception(f"[THREAD] Error on thread creation:")
             return None
 
     def get_threads(self, access_token: str) -> list[Thread]|None:
+        """Get all threads from a user.
+
+        Args:
+            access_token (str): User access token.
+
+        Returns:
+            list[Thread]|None: A list of Thread objects if any thread was found. None otherwise.
+        """
         self.logger.info("[THREAD] Retrieving threads")
         try:
             response = requests.get(
@@ -109,12 +118,12 @@ class APIClient:
             return None
 
     def send_message(self, access_token: str, message: str, thread_id: UUID) -> MessagePair:
-        """Send a user message
+        """Send a user message.
 
         Args:
-            access_token (str): User access token
-            message (str): User message
-            thread_id (UUID): Thread unique identifier
+            access_token (str): User access token.
+            message (str): User message.
+            thread_id (UUID): Thread unique identifier.
 
         Returns:
             MessagePair:
@@ -154,16 +163,16 @@ class APIClient:
         return MessagePair(**message_pair)
 
     def send_feedback(self, access_token: str, message_pair_id: UUID, rating: int, comments: str) -> bool:
-        """Send a feedback
+        """Send a feedback.
 
         Args:
-            access_token (str): User access token
-            message_pair_id (UUID): The message pair unique identifier
-            rating (int): The rating (0 or 1)
-            comments (str): The comments
+            access_token (str): User access token.
+            message_pair_id (UUID): The message pair unique identifier.
+            rating (int): The rating (0 or 1).
+            comments (str): The comments.
 
         Returns:
-            bool: Whether the operation succeeded or not
+            bool: Whether the operation succeeded or not.
         """
         feedback_meaning = "positive" if rating else "negative"
 
@@ -186,14 +195,14 @@ class APIClient:
             return False
 
     def clear_thread(self, access_token: str, thread_id: UUID) -> bool:
-        """Clear a thread
+        """Clear a thread.
 
         Args:
-            access_token (str): User access token
-            thread_id (UUID): Thread unique identifier
+            access_token (str): User access token.
+            thread_id (UUID): Thread unique identifier.
 
         Returns:
-            bool: Whether the operation succeeded or not
+            bool: Whether the operation succeeded or not.
         """
         self.logger.info(f"""[CLEAR] Clearing assistant memory""")
 
