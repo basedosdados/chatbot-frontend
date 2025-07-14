@@ -56,21 +56,18 @@ st.set_page_config(
 
 api = APIClient(BASE_URL)
 
-if "logged_in" not in st.session_state:
-    st.session_state["logged_in"] = False
+def show_about():
+    st.session_state["show_about"] = True
 
-if "show_home" not in st.session_state:
-    st.session_state["show_home"] = False
-
-def show_home():
-    st.session_state["show_home"] = True
+def show_logout():
+    st.session_state["show_logout"] = True
 
 def set_current_chat_id(chat_id: uuid.UUID|None):
     st.session_state["current_chat_id"] = chat_id
 
 def delete_chat(chat_id: uuid.UUID):
     set_current_chat_id(None)
-    _ = st.session_state["conversations"].pop(chat_id)
+    del st.session_state["conversations"][chat_id]
     _ = api.clear_thread(st.session_state["access_token"], chat_id)
 
 def render_login():
@@ -84,7 +81,7 @@ def render_login():
         email = st.text_input("E-mail")
         password = st.text_input("Senha", type="password")
 
-        col1, col2, _ = st.columns([1.1, 1.5, 6.86])
+        col1, _ = st.columns(2)
 
         if col1.form_submit_button("Entrar", type="primary"):
             access_token, message = api.authenticate(email, password)
@@ -95,7 +92,7 @@ def render_login():
         if threads is not None:
             st.session_state["conversations"] = OrderedDict({
                 thread.id: ChatPage(api, title=thread.title, thread_id=str(thread.id))
-                for thread in threads if not thread.deleted
+                for thread in threads
             })
         else:
             st.session_state["conversations"] = OrderedDict()
@@ -110,6 +107,11 @@ def render_login():
     elif message is not None:
         st.error(message, icon=":material/error:")
 
+def render_logout():
+    st.title("Tem certeza que deseja sair?")
+    st.caption("Clique no botão abaixo para confirmar")
+    st.button("Sair", type="primary", on_click=st.session_state.clear)
+
 def render_sidebar():
     """Render sidebar with conversations"""
     with st.sidebar:
@@ -118,8 +120,8 @@ def render_sidebar():
 
         st.divider()
         st.markdown("") # just for spacing
-        st.button("Home", icon=":material/home:", on_click=show_home)
-        st.button("Logout", icon=":material/logout:", on_click=st.session_state.clear)
+        st.button("Sair", icon=":material/logout:", on_click=show_logout)
+        st.button("Conheça o App", icon=":material/info:", on_click=show_about)
         st.divider()
 
         st.subheader(":gray[Suas conversas]")
@@ -164,7 +166,7 @@ def render_chat_page():
         chat_page: ChatPage = st.session_state["conversations"][chat_id]
         chat_page.render()
 
-def render_home_page():
+def render_about_page():
     st.title("Chatbot BD")
     st.caption("Para consultas em bases de dados utilizando linguagem natural")
 
@@ -209,12 +211,15 @@ def render_home_page():
             - Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.
             - Após sair da aplicação ou fechá-la, o histórico de conversa e a memória do chatbot serão deletados.""")
 
-if not st.session_state["logged_in"]:
-    render_login()
-else:
-    if st.session_state["show_home"]:
-        render_home_page()
-        st.session_state["show_home"] = False
+if st.session_state.get("logged_in"):
+    if st.session_state.get("show_about"):
+        render_about_page()
+        st.session_state["show_about"] = False
+    elif st.session_state.get("show_logout"):
+        render_logout()
+        st.session_state["show_logout"] = False
     else:
         render_chat_page()
     render_sidebar()
+else:
+    render_login()
