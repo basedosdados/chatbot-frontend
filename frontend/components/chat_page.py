@@ -35,7 +35,7 @@ class ChatPage:
             self.title = thread.title
             self.thread_id = thread.id
             st.session_state["current_chat_id"] = self.thread_id
-            st.session_state["conversations"][self.thread_id] = self
+            st.session_state["chat_pages"][self.thread_id] = self
         else:
             show_error_popup("Não foi possível criar a thread.")
 

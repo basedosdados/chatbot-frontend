@@ -67,7 +67,7 @@ def set_current_chat_id(chat_id: uuid.UUID|None):
 
 def delete_chat(chat_id: uuid.UUID):
     set_current_chat_id(None)
-    del st.session_state["conversations"][chat_id]
+    del st.session_state["chat_pages"][chat_id]
     _ = api.clear_thread(st.session_state["access_token"], chat_id)
 
 def render_login():
@@ -90,12 +90,12 @@ def render_login():
         threads = api.get_threads(access_token)
 
         if threads is not None:
-            st.session_state["conversations"] = OrderedDict({
+            st.session_state["chat_pages"] = OrderedDict({
                 thread.id: ChatPage(api, title=thread.title, thread_id=str(thread.id))
                 for thread in threads
             })
         else:
-            st.session_state["conversations"] = OrderedDict()
+            st.session_state["chat_pages"] = OrderedDict()
 
         st.session_state["email"] = email
         st.session_state["logged_in"] = True
@@ -113,7 +113,7 @@ def render_logout():
     st.button("Sair", type="primary", on_click=st.session_state.clear)
 
 def render_sidebar():
-    """Render sidebar with conversations"""
+    """Render sidebar with chats"""
     with st.sidebar:
         email: str = st.session_state['email']
         st.subheader(f"Olá, {email.split("@")[0]}! :wave:")
@@ -127,9 +127,9 @@ def render_sidebar():
         st.subheader(":gray[Suas conversas]")
         st.button("Nova conversa", icon=":material/add:", on_click=set_current_chat_id, args=(None,))
 
-        conversations: OrderedDict[uuid.UUID, ChatPage] = st.session_state["conversations"]
+        chat_pages: OrderedDict[uuid.UUID, ChatPage] = st.session_state["chat_pages"]
 
-        for chat_id, chat_page in reversed(conversations.items()):
+        for chat_id, chat_page in reversed(chat_pages.items()):
             col1, col2 = st.columns([4.1, 1])
 
             with col1:
@@ -163,7 +163,7 @@ def render_chat_page():
         chat_page = ChatPage(api)
         chat_page.render()
     else:
-        chat_page: ChatPage = st.session_state["conversations"][chat_id]
+        chat_page: ChatPage = st.session_state["chat_pages"][chat_id]
         chat_page.render()
 
 def render_about_page():
