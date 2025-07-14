@@ -11,7 +11,6 @@ class Thread(BaseModel):
     account: int
     title: str|None
     created_at: datetime
-    deleted: bool
 
 class UserMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
