@@ -65,10 +65,21 @@ def show_logout():
 def set_current_chat_id(chat_id: uuid.UUID|None):
     st.session_state["current_chat_id"] = chat_id
 
-def delete_chat(chat_id: uuid.UUID):
-    set_current_chat_id(None)
-    del st.session_state["chat_pages"][chat_id]
-    _ = api.clear_thread(st.session_state["access_token"], chat_id)
+@st.dialog("Excluir conversa")
+def show_delete_chat_modal(chat_id: uuid.UUID):
+    st.markdown("") # just for spacing
+    st.text("Tem certeza que deseja excluir esta conversa permanentemente?")
+    col1, col2, _ = st.columns([1.1, 2.1, 2])
+
+    if col1.button("Cancelar"):
+        st.rerun()
+
+    if col2.button("Sim, excluir", type="primary"):
+        set_current_chat_id(None)
+        chat_pages: OrderedDict = st.session_state["chat_pages"]
+        _ = chat_pages.pop(chat_id)
+        _ = api.delete_thread(st.session_state["access_token"], chat_id)
+        st.rerun()
 
 def render_login():
     st.title("Entrar")
@@ -141,7 +152,7 @@ def render_sidebar():
                     label = chat_page.title[:21].strip() + "..."
 
                 st.button(
-                    label=label,
+                    label=str(label),
                     key=f"chat_{chat_id}",
                     use_container_width=True,
                     on_click=set_current_chat_id,
@@ -152,7 +163,7 @@ def render_sidebar():
                 st.button(
                     label=":material/delete:",
                     key=f"delete_{chat_id}",
-                    on_click=delete_chat,
+                    on_click=show_delete_chat_modal,
                     args=(chat_id,)
                 )
 

@@ -196,8 +196,8 @@ class APIClient:
             self.logger.exception(f"[FEEDBACK] Error on sending feedback:")
             return False
 
-    def clear_thread(self, access_token: str, thread_id: UUID) -> bool:
-        """Clear a thread.
+    def delete_thread(self, access_token: str, thread_id: UUID) -> bool:
+        """Soft delete a thread and hard delete all its checkpoints.
 
         Args:
             access_token (str): User access token.
@@ -210,7 +210,7 @@ class APIClient:
 
         try:
             response = requests.delete(
-                url=f"{self.base_url}/chatbot/checkpoints/{thread_id}/",
+                url=f"{self.base_url}/chatbot/threads/{thread_id}/",
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
