@@ -143,29 +143,27 @@ def render_sidebar():
         for chat_id, chat_page in reversed(chat_pages.items()):
             col1, col2 = st.columns([4.1, 1])
 
-            with col1:
-                if chat_page.title is None:
-                    label = chat_page.thread_id
-                elif len(chat_page.title) <= 24:
-                    label = chat_page.title
-                else:
-                    label = chat_page.title[:21].strip() + "..."
+            if chat_page.title is None:
+                label = chat_page.thread_id
+            elif len(chat_page.title) <= 24:
+                label = chat_page.title
+            else:
+                label = chat_page.title[:21].strip() + "..."
 
-                st.button(
-                    label=str(label),
-                    key=f"chat_{chat_id}",
-                    use_container_width=True,
-                    on_click=set_current_chat_id,
-                    args=(chat_id,)
-                )
+            col1.button(
+                label=str(label),
+                key=f"chat_{chat_id}",
+                use_container_width=True,
+                on_click=set_current_chat_id,
+                args=(chat_id,)
+            )
 
-            with col2:
-                st.button(
-                    label=":material/delete:",
-                    key=f"delete_{chat_id}",
-                    on_click=show_delete_chat_modal,
-                    args=(chat_id,)
-                )
+            col2.button(
+                label=":material/delete:",
+                key=f"delete_{chat_id}",
+                on_click=show_delete_chat_modal,
+                args=(chat_id,)
+            )
 
 def render_chat_page():
     chat_id = st.session_state.get("current_chat_id")
