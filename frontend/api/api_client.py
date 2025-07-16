@@ -131,13 +131,9 @@ class APIClient:
             MessagePair:
                 A MessagePair object containing:
                     - id: unique identifier
-                    - thread: thread unique identifier
-                    - model_uri: assistant's model URI
                     - user_message: user message
                     - assistant_message: assistant message
                     - generated_queries: generated sql queries
-                    - generated_chart: generated data for visualization
-                    - created_at: message pair creation timestamp
         """
         user_message = UserMessage(content=message)
 
@@ -155,8 +151,6 @@ class APIClient:
         except requests.RequestException:
             self.logger.exception(f"[MESSAGE] Error on sending user message:")
             message_pair = {
-                "thread": thread_id,
-                "model_uri": "",
                 "user_message": user_message.content,
                 "assistant_message": "Ops, algo deu errado! Por favor, tente novamente. "\
                     "Se o problema persistir, avise-nos. Obrigado pela paciência!"

@@ -106,17 +106,10 @@ class ChatPage:
             message_pair (MessagePair):
                 A MessagePair object containing:
                     - id: unique identifier
-                    - thread_id: thread unique identifier
-                    - model_uri: uri for the assistant's model
                     - user_message: user message
                     - assistant_message: assistant message
                     - generated_queries: generated sql queries
-                    - generated_chart: generated data for visualization
-                    - created_at: message pair creation timestamp
         """
-        # Placeholder for showing the generated chart
-        chart_placeholder = st.empty()
-
         # Placeholder for showing the generated SQL queries
         code_placeholder = st.empty()
 
@@ -128,18 +121,14 @@ class ChatPage:
         # the second one is for the feedback buttons
         # the third one is for the comments input
         # the fourth one is for the feedback sending button
-        col0, col1, col2, col3, col4 = feedback_container.columns(
-            (0.06, 0.06, 0.12, 0.86, 0.1),
+        col1, col2, col3, col4 = feedback_container.columns(
+            (0.06, 0.12, 0.93, 0.1),
             vertical_alignment="center"
         )
 
         # Checks if the model is still answering the last question.
         # If yes, all message buttons and comments inputs will be disabled
         waiting_for_answer = st.session_state[self.waiting_key]
-
-        # Unique flag and button key for chart-showing
-        show_chart_id = f"show_chart_{message_pair.id}"
-        show_chart_btn_id = f"show_chart_btn_{message_pair.id}"
 
         # Unique flag and button key for code-showing
         show_code_id = f"show_code_{message_pair.id}"
@@ -156,10 +145,6 @@ class ChatPage:
         if show_code_id not in st.session_state:
             st.session_state[show_code_id] = False
 
-        # By default, the charts should be displayed if any are available
-        if show_chart_id not in st.session_state:
-            st.session_state[show_chart_id] = message_pair.has_valid_chart
-
         # By default, the comments input should be hidden
         if show_comments_id not in st.session_state:
             st.session_state[show_comments_id] = False
@@ -171,30 +156,6 @@ class ChatPage:
         if feedback_id in page_feedbacks:
             last_feedback = page_feedbacks[feedback_id]
             st.session_state[feedback_id] = last_feedback
-
-        # Renders the chart-showing button
-        with col0:
-            with chart_button_container():
-                st.button(
-                    " ",
-                    key=show_chart_btn_id,
-                    on_click=self._toggle_flag,
-                    args=(show_chart_id,),
-                    disabled=waiting_for_answer
-                )
-
-        # If the chart-showing flag is set, shows the generated chart
-        if st.session_state[show_chart_id]:
-            if message_pair.has_valid_chart:
-                try:
-                    self._plot_chart(chart_placeholder, message_pair)
-                except Exception:
-                    self.logger.exception(f"Error on plotting chart for message pair {message_pair.id}:")
-                    chart_placeholder.error("Ops! Algo deu errado na exibição do gráfico.")
-            elif message_pair.has_chart:
-                chart_placeholder.error("Ops! Ocorreu um erro na criação do gráfico.")
-            else:
-                chart_placeholder.info("Nenhum gráfico foi gerado.")
 
         # Renders the code-showing button
         with col1:
