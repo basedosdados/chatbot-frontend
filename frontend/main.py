@@ -1,6 +1,4 @@
 import time
-import uuid
-from collections import OrderedDict
 from functools import cache
 from pathlib import Path
 
@@ -56,32 +54,7 @@ st.set_page_config(
 
 api = APIClient(BASE_URL)
 
-def show_about():
-    st.session_state["show_about"] = True
-
-def show_logout():
-    st.session_state["show_logout"] = True
-
-def set_current_chat_id(chat_id: uuid.UUID|None):
-    st.session_state["current_chat_id"] = chat_id
-
-@st.dialog("Excluir conversa")
-def show_delete_chat_modal(chat_id: uuid.UUID):
-    st.markdown("") # just for spacing
-    st.text("Tem certeza que deseja excluir esta conversa permanentemente?")
-    col1, col2, _ = st.columns([1.1, 2.1, 2])
-
-    if col1.button("Cancelar"):
-        st.rerun()
-
-    if col2.button("Sim, excluir", type="primary"):
-        set_current_chat_id(None)
-        chat_pages: OrderedDict = st.session_state["chat_pages"]
-        _ = chat_pages.pop(chat_id)
-        _ = api.delete_thread(st.session_state["access_token"], chat_id)
-        st.rerun()
-
-def render_login():
+def login():
     st.title("Entrar")
     st.caption("Por favor, insira seu e-mail e senha para continuar")
 
@@ -101,81 +74,33 @@ def render_login():
         threads = api.get_threads(access_token)
 
         if threads is not None:
-            st.session_state["chat_pages"] = OrderedDict({
-                thread.id: ChatPage(api, title=thread.title, thread_id=str(thread.id))
+            st.session_state["chat_pages"] = [
+                ChatPage(api, title=thread.title, thread_id=str(thread.id))
                 for thread in threads
-            })
+            ]
         else:
-            st.session_state["chat_pages"] = OrderedDict()
+            st.session_state["chat_pages"] = []
 
         st.session_state["email"] = email
         st.session_state["logged_in"] = True
         st.session_state["access_token"] = access_token
-
         st.success(message, icon=":material/check:")
         time.sleep(0.5)
         st.rerun()
     elif message is not None:
         st.error(message, icon=":material/error:")
 
-def render_logout():
+def logout():
     st.title("Tem certeza que deseja sair?")
     st.caption("Clique no botão abaixo para confirmar")
-    st.button("Sair", type="primary", on_click=st.session_state.clear)
 
-def render_sidebar():
-    """Render sidebar with chats"""
-    with st.sidebar:
-        email: str = st.session_state['email']
-        st.subheader(f"Olá, {email.split("@")[0]}! :wave:")
+    if st.button("Sair", type="primary"):
+        st.session_state.clear()
+        st.success("Desconectado com sucesso!", icon=":material/check:")
+        time.sleep(0.5)
+        st.rerun()
 
-        st.divider()
-        st.markdown("") # just for spacing
-        st.button("Sair", icon=":material/logout:", on_click=show_logout)
-        st.button("Conheça o App", icon=":material/info:", on_click=show_about)
-        st.divider()
-
-        st.subheader(":gray[Suas conversas]")
-        st.button("Nova conversa", icon=":material/add:", on_click=set_current_chat_id, args=(None,))
-
-        chat_pages: OrderedDict[uuid.UUID, ChatPage] = st.session_state["chat_pages"]
-
-        for chat_id, chat_page in reversed(chat_pages.items()):
-            col1, col2 = st.columns([4.1, 1])
-
-            if chat_page.title is None:
-                label = chat_page.thread_id
-            elif len(chat_page.title) <= 24:
-                label = chat_page.title
-            else:
-                label = chat_page.title[:21].strip() + "..."
-
-            col1.button(
-                label=str(label),
-                key=f"chat_{chat_id}",
-                use_container_width=True,
-                on_click=set_current_chat_id,
-                args=(chat_id,)
-            )
-
-            col2.button(
-                label=":material/delete:",
-                key=f"delete_{chat_id}",
-                on_click=show_delete_chat_modal,
-                args=(chat_id,)
-            )
-
-def render_chat_page():
-    chat_id = st.session_state.get("current_chat_id")
-
-    if chat_id is None:
-        chat_page = ChatPage(api)
-        chat_page.render()
-    else:
-        chat_page: ChatPage = st.session_state["chat_pages"][chat_id]
-        chat_page.render()
-
-def render_about_page():
+def about():
     st.title("Chatbot BD")
     st.caption("Para consultas em bases de dados utilizando linguagem natural")
 
@@ -220,15 +145,38 @@ def render_about_page():
             - Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.
             - Após sair da aplicação ou fechá-la, o histórico de conversa e a memória do chatbot serão deletados.""")
 
+login_page = st.Page(page=login, title="Entrar", icon=":material/login:")
+
 if st.session_state.get("logged_in"):
-    if st.session_state.get("show_about"):
-        render_about_page()
-        st.session_state["show_about"] = False
-    elif st.session_state.get("show_logout"):
-        render_logout()
-        st.session_state["show_logout"] = False
-    else:
-        render_chat_page()
-    render_sidebar()
+    about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
+    logout_page = st.Page(page=logout, title="Sair", icon=":material/logout:")
+
+    new_chat_page = st.Page(
+        page=ChatPage(api).render,
+        title="Nova conversa",
+        icon=":material/add:",
+        url_path="chat",
+        default=True
+    )
+
+    chat_pages: list[ChatPage] = st.session_state.get("chat_pages", [])
+
+    user_chat_pages = [
+        st.Page(
+            page=chat_page.render,
+            title=chat_page.title,
+            url_path=f"{chat_page.thread_id}"
+        ) for chat_page in reversed(chat_pages)
+    ]
+
+    sections = {
+        "Sobre": [about_page],
+        "Sua conta": [logout_page],
+        "Suas conversas": [new_chat_page] + user_chat_pages,
+    }
+
+    page = st.navigation(sections)
 else:
-    render_login()
+    page = st.navigation(pages=[login_page], position="hidden")
+
+page.run()

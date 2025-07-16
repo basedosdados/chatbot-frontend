@@ -1,10 +1,7 @@
 import uuid
 
-import pandas as pd
-import plotly.express as px
 import streamlit as st
 from loguru import logger
-from streamlit.delta_generator import DeltaGenerator
 
 from frontend.api import APIClient
 from frontend.components import *
@@ -14,7 +11,6 @@ from frontend.utils.icons import AVATARS
 
 class ChatPage:
     chat_history_key = "chat_history"
-    chat_buttons_key = "chat_buttons"
     feedbacks_key = "feedbacks"
     waiting_key = "waiting_for_answer"
 
@@ -34,8 +30,7 @@ class ChatPage:
         if thread is not None:
             self.title = thread.title
             self.thread_id = thread.id
-            st.session_state["current_chat_id"] = self.thread_id
-            st.session_state["chat_pages"][self.thread_id] = self
+            st.session_state["chat_pages"].append(self)
         else:
             show_error_popup("Não foi possível criar a thread.")
 
@@ -96,49 +91,6 @@ class ChatPage:
 
         st.session_state[show_comments_id] = False
 
-    @staticmethod
-    def _plot_chart(placeholder: DeltaGenerator, message_pair: MessagePair):
-        data = pd.DataFrame(message_pair.chart_data.data)
-        data = data.fillna("N/A")
-
-        metadata = message_pair.chart_metadata
-
-        human_friendly_labels = {
-            metadata.x_axis: metadata.x_axis_title,
-            metadata.y_axis: metadata.y_axis_title,
-        }
-
-        if metadata.valid_label is not None:
-            human_friendly_labels[metadata.valid_label] = metadata.label_title
-
-        kwargs = {
-            "x": metadata.x_axis,
-            "y": metadata.y_axis,
-            "color": metadata.valid_label,
-            "labels": human_friendly_labels,
-            "title": metadata.title
-        }
-
-        match metadata.chart_type:
-            case "bar":
-                fig = px.bar(data, **kwargs)
-            case "horizontal_bar":
-                fig = px.bar(data, orientation="h", **kwargs)
-            case "line":
-                fig = px.line(data, markers=True, **kwargs)
-            case "pie":
-                kwargs["names"] = kwargs.pop("x")
-                kwargs["values"] = kwargs.pop("y")
-                fig = px.pie(data, hole=0.5, **kwargs)
-            case "scatter":
-                fig = px.scatter(data, **kwargs)
-            case _:
-                raise NotImplementedError(f"{metadata.chart_type} chart is not implemented")
-
-        fig.update_layout(margin={"b": 0})
-
-        placeholder.plotly_chart(fig)
-
     def _toggle_flag(self, flag_id: str):
         """Toggle a flag on session state
 
@@ -183,7 +135,7 @@ class ChatPage:
 
         # Checks if the model is still answering the last question.
         # If yes, all message buttons and comments inputs will be disabled
-        waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
+        waiting_for_answer = st.session_state[self.waiting_key]
 
         # Unique flag and button key for chart-showing
         show_chart_id = f"show_chart_{message_pair.id}"
@@ -298,11 +250,10 @@ class ChatPage:
             )
 
     def _handle_user_interaction(self):
-        """Disable all chat message buttons, comments inputs and the chat input while the model
-        is answering a question and enable the chat reset and download buttons rendering
+        """Disable all chat message buttons, comments inputs
+        and the chat input while the model is answering a question
         """
-        st.session_state[self.page_id][self.chat_buttons_key] = False
-        st.session_state[self.page_id][self.waiting_key] = True
+        st.session_state[self.waiting_key] = True
 
     def render(self):
         """Render the chat page"""
@@ -319,12 +270,12 @@ class ChatPage:
         if self.page_id not in st.session_state:
             st.session_state[self.page_id] = {}
 
-        page_session_state = st.session_state[self.page_id]
-
         # Initialize the waiting key, which is used to prevent users from
         # interacting with the app while the model is answering a question
-        if self.waiting_key not in page_session_state:
-            page_session_state[self.waiting_key] = False
+        if self.waiting_key not in st.session_state:
+            st.session_state[self.waiting_key] = False
+
+        page_session_state = st.session_state[self.page_id]
 
         # Initialize chat history state
         if self.chat_history_key not in page_session_state:
@@ -341,10 +292,6 @@ class ChatPage:
         # Initialize feedback history
         if self.feedbacks_key not in page_session_state:
             page_session_state[self.feedbacks_key] = {}
-
-        # Initialize reset flag state
-        if self.chat_buttons_key not in page_session_state:
-            page_session_state[self.chat_buttons_key] = True
 
         chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
 
@@ -367,7 +314,7 @@ class ChatPage:
         if user_prompt := st.chat_input(
             "Faça uma pergunta!",
             on_submit=self._handle_user_interaction,
-            disabled=page_session_state[self.waiting_key]
+            disabled=st.session_state[self.waiting_key]
         ):
             # Clear subheader message
             subheader.empty()
@@ -406,9 +353,14 @@ class ChatPage:
         # Render the disclaimer messages
         render_disclaimer()
 
-        if page_session_state[self.waiting_key]:
-            page_session_state[self.waiting_key] = False
-            st.rerun()
+        if st.session_state[self.waiting_key]:
+            st.session_state[self.waiting_key] = False
+            current_page = st.Page(
+                page=self.render,
+                title=self.title,
+                url_path=f"{self.thread_id}"
+            )
+            st.switch_page(current_page)
 
 @st.dialog("Erro")
 def show_error_popup(message: str):
