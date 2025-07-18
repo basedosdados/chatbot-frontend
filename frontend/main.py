@@ -149,7 +149,6 @@ if st.session_state.get("logged_in"):
         page=ChatPage(api).render,
         title="Nova conversa",
         icon=":material/add:",
-        url_path="chat",
         default=True
     )
 
