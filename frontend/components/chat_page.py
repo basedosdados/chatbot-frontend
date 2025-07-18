@@ -280,33 +280,31 @@ class ChatPage:
 
         page_session_state = st.session_state[self.page_id]
 
-        # Initialize chat history state
+        # Initialize feedback history
+        if self.feedbacks_key not in page_session_state:
+            page_session_state[self.feedbacks_key] = {}
+
+        # Initialize chat history state and chat deletion flag state
         if self.chat_history_key not in page_session_state:
             if self.thread_id is not None:
                 message_pairs = self.api.get_message_pairs(
                     access_token=st.session_state["access_token"],
                     thread_id=self.thread_id
                 )
+                # If the thread is already created, the deletion button is enabled
+                page_session_state[self.delete_btn_key] = False
             else:
                 message_pairs = []
-
+                # Otherwise, it is disabled
+                page_session_state[self.delete_btn_key] = True
             page_session_state[self.chat_history_key] = message_pairs or []
-
-        # Initialize feedback history
-        if self.feedbacks_key not in page_session_state:
-            page_session_state[self.feedbacks_key] = {}
 
         chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
 
-
-        # Initialize the chat deletion flag state
         # Display the subheader message only if the chat history is empty
         if not chat_history:
             with subheader:
                 typewrite("Como posso ajudar?")
-            page_session_state[self.delete_btn_key] = True
-        else:
-            page_session_state[self.delete_btn_key] = False
 
         # Display chat messages from history on app rerun
         for message_pair in chat_history:
