@@ -335,7 +335,7 @@ class ChatPage:
                     state = "error"
 
                 with st.status(label=label, state=state) as status:
-                    for step in message_pair.steps:
+                    for step in message_pair.safe_steps:
                         st.caption(step.content)
 
                 if not message_pair.error_message:

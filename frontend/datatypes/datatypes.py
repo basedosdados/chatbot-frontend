@@ -38,6 +38,10 @@ class MessagePair(BaseModel):
         )
 
     @property
+    def safe_steps(self) -> list[Step]:
+        return self.steps or []
+
+    @property
     def stream_characters(self) -> Generator[str]:
         """Streams the assistant message character by character
 
