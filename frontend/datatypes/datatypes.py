@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, UUID4
 class Thread(BaseModel):
     id: UUID4
     account: int
-    title: str|None
+    title: str
     created_at: datetime
 
 class UserMessage(BaseModel):

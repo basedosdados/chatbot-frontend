@@ -53,12 +53,12 @@ class APIClient:
 
         return access_token, message
 
-    def create_thread(self, access_token: str, title: str|None = None) -> Thread|None:
+    def create_thread(self, access_token: str, title: str) -> Thread|None:
         """Create a thread.
 
         Args:
             access_token (str): User access token.
-            title (str | None, optional): The thread title. Defaults to None.
+            title (str): The thread title.
 
         Returns:
             Thread|None: A Thread object if the thread was created successfully. None otherwise.

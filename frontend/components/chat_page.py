@@ -22,7 +22,12 @@ class ChatPage:
         self.page_id = str(uuid.uuid4())
         self.logger = logger.bind(classname=self.__class__.__name__)
 
-    def _create_thread_and_register(self, title: str|None = None):
+    def _create_thread_and_register(self, title: str):
+        """Create a thread for this chat page and add itself to the chat pages list
+
+        Args:
+            title (str): The thread title
+        """
         thread = self.api.create_thread(
             access_token=st.session_state["access_token"],
             title=title,
