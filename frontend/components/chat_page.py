@@ -23,13 +23,13 @@ class ChatPage:
         self.logger = logger.bind(classname=self.__class__.__name__)
 
     def _create_thread_and_register(self, title: str) -> bool:
-        """Create a thread for this chat page and add itself to the chat pages list
+        """Create a thread for this chat page and add itself to the chat pages list.
 
         Args:
-            title (str): The thread title
+            title (str): The thread title.
 
         Returns:
-            bool: Whether the thread creation was successful
+            bool: Whether the thread creation was successful.
         """
         thread = self.api.create_thread(
             access_token=st.session_state["access_token"],
@@ -47,11 +47,11 @@ class ChatPage:
             return False
 
     def _handle_click_feedback(self, feedback_id: str, show_comments_id: str):
-        """Update the feedback buttons state and the comments text input flag on session state
+        """Update the feedback buttons state and the comments text input flag on session state.
 
         Args:
-            feedback_id (str): The feedback button identifier
-            show_comments_id (str): The comments text input flag identifier
+            feedback_id (str): The feedback button identifier.
+            show_comments_id (str): The comments text input flag identifier.
         """
         feedback = st.session_state[feedback_id]
 
@@ -82,13 +82,13 @@ class ChatPage:
         show_comments_id: str,
         comments: str
     ):
-        """Handle feedback sending
+        """Handle feedback sending.
 
         Args:
-            feedback_id (str): The feedback id
-            message_pair_id (UUID): The message pair id
-            show_comments_id (str): The show_comments flag id
-            comments (str): The comments
+            feedback_id (str): The feedback id.
+            message_pair_id (UUID): The message pair id.
+            show_comments_id (str): The show_comments flag id.
+            comments (str): The comments.
         """
         rating = st.session_state[feedback_id]
         access_token = st.session_state["access_token"]
@@ -112,15 +112,15 @@ class ChatPage:
         st.session_state[flag_id] = not st.session_state[flag_id]
 
     def _render_message_buttons(self, message_pair: MessagePair):
-        """Render the code-showing button and all the feedback related widgets on assistant's messages
+        """Render the code-showing button and all the feedback related widgets on assistant's messages.
 
         Args:
             message_pair (MessagePair):
                 A MessagePair object containing:
-                    - id: unique identifier
-                    - user_message: user message
-                    - assistant_message: assistant message
-                    - generated_queries: generated sql queries
+                    - id: unique identifier.
+                    - user_message: user message.
+                    - assistant_message: assistant message.
+                    - generated_queries: generated sql queries.
         """
         # Placeholder for showing the generated SQL queries
         code_placeholder = st.empty()
@@ -222,30 +222,36 @@ class ChatPage:
                 disabled=waiting_for_answer
             )
 
-    def _handle_user_interaction(self):
-        """Disable all chat message buttons, comments inputs and the chat input while
-        the model is answering a question and enable the chat deletion button rendering
-        """
-        st.session_state[self.page_id][self.delete_btn_key] = False
-        st.session_state[self.waiting_key] = True
-
-    def _delete_page(self):
-        deleted = self.api.delete_thread(
-            access_token=st.session_state["access_token"],
-            thread_id=self.thread_id
-        )
-
-        if deleted:
-            chat_pages: list[ChatPage] = st.session_state["chat_pages"]
-            for i, chat_page in enumerate(chat_pages):
-                if chat_page.thread_id == self.thread_id:
-                    chat_pages.pop(i)
-                    break
-        else:
-            show_error_popup("Não foi possível excluir a conversa.")
-
     def _render_delete_button(self):
-        """Render the chat reset and download buttons"""
+        """Render the chat deletion button."""
+        @st.dialog("Excluir conversa")
+        def show_delete_chat_modal():
+            st.markdown("") # just for spacing
+            st.text("Tem certeza que deseja excluir esta conversa permanentemente?")
+
+            col1, col2, _ = st.columns([1.1, 2.1, 2])
+
+            if col1.button("Cancelar"):
+                st.rerun()
+
+            if col2.button("Sim, excluir", type="primary"):
+                deleted = self.api.delete_thread(
+                    access_token=st.session_state["access_token"],
+                    thread_id=self.thread_id
+                )
+
+                if not deleted:
+                    st.error("Não foi possível excluir a conversa.", icon=":material/error:")
+                    return
+
+                chat_pages: list[ChatPage] = st.session_state["chat_pages"]
+                for i, chat_page in enumerate(chat_pages):
+                    if chat_page.thread_id == self.thread_id:
+                        chat_pages.pop(i)
+                        break
+
+                st.rerun()
+
         page_session_state = st.session_state[self.page_id]
         chat_delete_disabled = page_session_state[self.delete_btn_key]
 
@@ -255,8 +261,15 @@ class ChatPage:
         st.button(
             label="Excluir",
             icon=":material/delete:",
-            on_click=self._delete_page,
+            on_click=show_delete_chat_modal,
         )
+
+    def _handle_user_interaction(self):
+        """Disable all chat message buttons, comments inputs and the chat input while
+        the model is answering a question and enable the chat deletion button rendering.
+        """
+        st.session_state[self.page_id][self.delete_btn_key] = False
+        st.session_state[self.waiting_key] = True
 
     def render(self):
         """Render the chat page"""

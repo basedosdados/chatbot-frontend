@@ -26,7 +26,7 @@ class MessagePair(BaseModel):
     assistant_message: str|None
     error_message: str|None
     generated_queries: list[str] | None = Field(default=None)
-    steps: list[Step]
+    steps: list[Step]|None
 
     @model_validator(mode="after")
     def validate_exactly_one_response(self) -> "MessagePair":
