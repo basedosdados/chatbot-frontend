@@ -142,7 +142,7 @@ class APIClient:
         try:
             with httpx.stream(
                 method="POST",
-                url=f"{self.base_url}/chat/threads/{thread_id}/messages/stream/",
+                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
                 headers={"Authorization": f"Bearer {access_token}"},
                 json=user_message.model_dump(mode="json"),
                 timeout=httpx.Timeout(5.0, read=300.0),

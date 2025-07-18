@@ -23,8 +23,8 @@ class Step(BaseModel):
 class MessagePair(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
     user_message: str
-    assistant_message: str|None
-    error_message: str|None
+    assistant_message: str|None = Field(default=None)
+    error_message: str|None = Field(default=None)
     generated_queries: list[str] | None = Field(default=None)
     steps: list[Step]|None
 
