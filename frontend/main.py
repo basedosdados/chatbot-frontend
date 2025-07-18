@@ -7,7 +7,9 @@ from loguru import logger
 
 from frontend.api import APIClient
 from frontend.components.chat_page import ChatPage
-from frontend.utils.constants import *
+from frontend.utils.constants import (BASE_URL, LOG_BACKTRACE, LOG_DIAGNOSE,
+                                      LOG_ENQUEUE, LOG_FILE_PATH, LOG_LEVEL,
+                                      LOG_RETENTION, LOG_ROTATION)
 from frontend.utils.icons import AVATARS
 
 

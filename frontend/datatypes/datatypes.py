@@ -1,9 +1,9 @@
 import time
 import uuid
+from collections.abc import Generator
 from datetime import datetime
-from typing import Iterator
 
-from pydantic import BaseModel, Field, UUID4
+from pydantic import UUID4, BaseModel, Field, model_validator
 
 
 class Thread(BaseModel):
@@ -16,33 +16,50 @@ class UserMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     content: str
 
+class Step(BaseModel):
+    label: str
+    content: str
+
 class MessagePair(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
     user_message: str
-    assistant_message: str
+    assistant_message: str|None
+    error_message: str|None
     generated_queries: list[str] | None = Field(default=None)
+    steps: list[Step]
+
+    @model_validator(mode="after")
+    def validate_exactly_one_response(self) -> "MessagePair":
+        if (self.assistant_message is not None) ^ (self.error_message is not None):
+            return self
+        raise ValueError(
+            "Only one and exactly one of 'assistant_message' "
+            "or 'error_message' fields must be provided"
+        )
 
     @property
-    def stream_characters(self) -> Iterator[str]:
+    def stream_characters(self) -> Generator[str]:
         """Streams the assistant message character by character
 
         Yields:
-            Iterator[str]
+            Generator[str]
         """
-        for character in self.assistant_message:
-            yield character
-            time.sleep(0.01)
+        if self.assistant_message:
+            for character in self.assistant_message:
+                yield character
+                time.sleep(0.01)
 
     @property
-    def stream_words(self) -> Iterator[str]:
+    def stream_words(self) -> Generator[str]:
         """Streams the assistant message word by word
 
         Yields:
-            Iterator[str]
+            Generator[str]
         """
-        for word in filter(None, self.assistant_message.split(" ")):
-            yield word + " "
-            time.sleep(0.02)
+        if self.assistant_message:
+            for word in filter(None, self.assistant_message.split(" ")):
+                yield word + " "
+                time.sleep(0.02)
 
     @property
     def formatted_sql_queries(self) -> str | None:

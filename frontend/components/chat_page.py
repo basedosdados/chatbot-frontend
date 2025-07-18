@@ -5,7 +5,7 @@ from loguru import logger
 
 from frontend.api import APIClient
 from frontend.components import *
-from frontend.datatypes import MessagePair
+from frontend.datatypes import MessagePair, Step
 from frontend.utils.icons import AVATARS
 
 
@@ -313,8 +313,23 @@ class ChatPage:
 
             with st.chat_message("assistant", avatar=AVATARS["assistant"]):
                 st.empty()
-                st.write(message_pair.assistant_message)
-                self._render_message_buttons(message_pair)
+
+                if not message_pair.error_message:
+                    label = "Concluído!"
+                    state = "complete"
+                else:
+                    label = "Erro"
+                    state = "error"
+
+                with st.status(label=label, state=state) as status:
+                    for step in message_pair.steps:
+                        st.caption(step.content)
+
+                if not message_pair.error_message:
+                    st.write(message_pair.assistant_message)
+                    self._render_message_buttons(message_pair)
+                else:
+                    st.error(message_pair.error_message)
 
         # Accept user input
         if user_prompt := st.chat_input(
@@ -331,11 +346,6 @@ class ChatPage:
 
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=AVATARS["assistant"]):
-                three_dots_placeholder = st.empty()
-
-                with three_dots_placeholder:
-                    three_pulsing_dots()
-
                 # Create thread only in the first message
                 if self.thread_id is None:
                     if not self._create_thread_and_register(title=user_prompt):
@@ -345,18 +355,32 @@ class ChatPage:
                         st.session_state[self.waiting_key] = False
                         return
 
-                message_pair = self.api.send_message(
-                    access_token=st.session_state["access_token"],
-                    message=user_prompt,
-                    thread_id=self.thread_id
-                )
+                with st.status("Consultando banco de dados...") as status:
+                    for streaming_status, message in self.api.send_message(
+                        access_token=st.session_state["access_token"],
+                        message=user_prompt,
+                        thread_id=self.thread_id
+                    ):
+                        if streaming_status == "running":
+                            step: Step = message
+                            status.update(label=step.label)
+                            st.caption(step.content)
+                        elif streaming_status == "complete":
+                            message_pair: MessagePair = message
+                            if not message_pair.error_message:
+                                label = "Concluído!"
+                                state = "complete"
+                            else:
+                                label = "Erro"
+                                state = "error"
+                            status.update(label=label, state=state)
 
-                three_dots_placeholder.empty()
-
-                _ = st.write_stream(message_pair.stream_words)
-
-                # Render the message buttons
-                self._render_message_buttons(message_pair)
+                if not message_pair.error_message:
+                    # Render the assistant message and message buttons
+                    _ = st.write_stream(message_pair.stream_words)
+                    self._render_message_buttons(message_pair)
+                else:
+                    st.error(message_pair.error_message)
 
             # Add message pair to chat history
             chat_history.append(message_pair)
