@@ -120,30 +120,26 @@ def about():
     # Available features
     st.subheader("Funcionalidades :memo:")
     st.write("""
-            - **Botão de Reset (:blue[:material/refresh:]):** clique no botão de reset para reiniciar a conversa com o chatbot, limpando a sua memória e o histórico de conversa, sem precisar sair da aplicação.
-            - **Botão de Download (:blue[:material/download:]):** clique no botão de download para exportar a **conversa** para um arquivo CSV. Apenas a **conversa** é exportada, e não os dados/tabelas disponíveis.
-            - **Botão de Gráfico (:blue[:material/bar_chart:]):** clique no botão de gráfico para exibir ou ocultar o gráfico gerado pelo chatbot. Ele pode gerar gráficos de barras verticais e horizontais, linhas, setores e de dispersão.
-            - **Botão de Código (:blue[:material/code:]):** clique no botão de código para exibir ou ocultar como o chatbot está fazendo as consultas nas bases de dados. O chatbot faz consultas em bases de dados armazenadas na nuvem usando linguagem SQL.
-            - **Botões de Feedback (:blue[:material/thumb_up:] ou :blue[:material/thumb_down:]):** clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais. É necessário clicar no botão de envio (:material/send:) para que o feedback seja enviado.""")
-
+        - **Exibir Código (:blue[:material/code:]):** Clique no botão de exibição de código para exibir ou ocultar as consultas SQL geradas pelo chatbot.
+        - **Feedback (:blue[:material/thumb_up:] ou :blue[:material/thumb_down:]):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais. É necessário clicar no botão de envio (:material/send:) para que o feedback seja enviado.
+        - **Excluir Conversa (:blue[:material/delete:]):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. Essa ação é irreversível."""
+    )
     st.write("\n")
 
     # Prompting guide
     st.subheader("Guia de Prompt :clipboard:")
     st.write("A forma como você conversa com o chatbot pode influenciar na qualidade das respostas! Por isso, abaixo estão listadas algumas dicas para te ajudar a elaborar suas perguntas. Elas podem ser úteis caso as respostas fornecidas estejam incorretas ou não sejam boas o suficiente!")
     st.write("""
-            1. Tente fazer uma pergunta por vez. Caso sua pergunta seja muito complexa, ou talvez seja um conjunto de várias perguntas, tente separá-la em perguntas menores e mais simples.
-            2. Tente utilizar termos como "**por**" ou "**total**" quando precisar de informações agregadas segundo alguma variável.
-            3. Caso saiba os nomes das colunas das tabelas, tente mencioná-los nas suas perguntas. Por exemplo, se você sabe que uma tabela possui a coluna "**município**", tente usar a palavra **município** ao invés de "cidade". Isso não significa que você não possa usar palavras parecidas, mas usar os nomes das colunas ajuda o chatbot.
-            4. Caso o chatbot não esteja encontrando uma resposta para a sua pergunta e você saiba em qual tabela estão os dados necessários para respondê-la, você pode tentar pedir explicitamente ao chatbot para procurar nessa tabela específica.""")
-
+        1. Tente fazer uma pergunta por vez. Caso sua pergunta seja muito complexa, ou talvez seja um conjunto de várias perguntas, tente separá-la em perguntas menores e mais simples.
+        2. Tente utilizar termos como "**por**" ou "**total**" quando precisar de informações agregadas segundo alguma variável.
+        3. Caso saiba os nomes das colunas das tabelas, tente mencioná-los nas suas perguntas. Por exemplo, se você sabe que uma tabela possui a coluna "**município**", tente usar a palavra **município** ao invés de "cidade". Isso não significa que você não possa usar palavras parecidas, mas usar os nomes das colunas ajuda!
+        4. Caso o chatbot não esteja encontrando uma resposta para a sua pergunta e você saiba em qual tabela estão os dados necessários para respondê-la, você pode tentar pedir explicitamente para procurar nessa tabela específica."""
+    )
     st.write("\n")
 
     # Important information
     st.subheader(":gray[:material/info:] Importante")
-    st.write("""
-            - Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.
-            - Após sair da aplicação ou fechá-la, o histórico de conversa e a memória do chatbot serão deletados.""")
+    st.info("Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.")
 
 login_page = st.Page(page=login, title="Entrar", icon=":material/login:")
 
