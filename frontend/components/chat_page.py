@@ -11,6 +11,7 @@ from frontend.utils.icons import AVATARS
 
 class ChatPage:
     chat_history_key = "chat_history"
+    delete_btn_key = "delete_btn"
     feedbacks_key = "feedbacks"
     waiting_key = "waiting_for_answer"
 
@@ -30,7 +31,8 @@ class ChatPage:
         if thread is not None:
             self.title = thread.title
             self.thread_id = thread.id
-            st.session_state["chat_pages"].append(self)
+            chat_pages: list[ChatPage] = st.session_state["chat_pages"]
+            chat_pages.append(self)
         else:
             show_error_popup("Não foi possível criar a thread.")
 
@@ -211,10 +213,40 @@ class ChatPage:
             )
 
     def _handle_user_interaction(self):
-        """Disable all chat message buttons, comments inputs
-        and the chat input while the model is answering a question
+        """Disable all chat message buttons, comments inputs and the chat input while
+        the model is answering a question and enable the chat deletion button rendering
         """
+        st.session_state[self.page_id][self.delete_btn_key] = False
         st.session_state[self.waiting_key] = True
+
+    def _delete_page(self):
+        deleted = self.api.delete_thread(
+            access_token=st.session_state["access_token"],
+            thread_id=self.thread_id
+        )
+
+        if deleted:
+            chat_pages: list[ChatPage] = st.session_state["chat_pages"]
+            for i, chat_page in enumerate(chat_pages):
+                if chat_page.thread_id == self.thread_id:
+                    chat_pages.pop(i)
+                    break
+        else:
+            show_error_popup("Não foi possível excluir a conversa.")
+
+    def _render_delete_button(self):
+        """Render the chat reset and download buttons"""
+        page_session_state = st.session_state[self.page_id]
+        chat_delete_disabled = page_session_state[self.delete_btn_key]
+
+        if chat_delete_disabled:
+            return
+
+        st.button(
+            label="Excluir",
+            icon=":material/delete:",
+            on_click=self._delete_page,
+        )
 
     def render(self):
         """Render the chat page"""
@@ -256,10 +288,15 @@ class ChatPage:
 
         chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
 
+
+        # Initialize the chat deletion flag state
         # Display the subheader message only if the chat history is empty
         if not chat_history:
             with subheader:
                 typewrite("Como posso ajudar?")
+            page_session_state[self.delete_btn_key] = True
+        else:
+            page_session_state[self.delete_btn_key] = False
 
         # Display chat messages from history on app rerun
         for message_pair in chat_history:
@@ -310,6 +347,9 @@ class ChatPage:
 
             # Add message pair to chat history
             chat_history.append(message_pair)
+
+        # Render the chat deletion button
+        self._render_delete_button()
 
         # Render the disclaimer messages
         render_disclaimer()
