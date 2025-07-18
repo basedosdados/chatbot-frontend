@@ -338,14 +338,12 @@ class ChatPage:
 
                 # Create thread only in the first message
                 if self.thread_id is None:
-                    created = self._create_thread_and_register(title=user_prompt)
-
-                if not created:
-                    # Setting this flag to False doesn't seem necessary here, but it might
-                    # prevent unexpected issues. Keeping it for safety until the underlying
-                    # behavior is better understood.
-                    st.session_state[self.waiting_key] = False
-                    return
+                    if not self._create_thread_and_register(title=user_prompt):
+                        # Setting this flag to False doesn't seem necessary here, but it might
+                        # prevent unexpected issues. Keeping it for safety until the underlying
+                        # behavior is better understood.
+                        st.session_state[self.waiting_key] = False
+                        return
 
                 message_pair = self.api.send_message(
                     access_token=st.session_state["access_token"],
