@@ -376,7 +376,7 @@ class ChatPage:
             current_page = st.Page(
                 page=self.render,
                 title=self.title,
-                url_path=f"{self.thread_id}"
+                url_path=str(self.thread_id)
             )
             st.switch_page(current_page)
 

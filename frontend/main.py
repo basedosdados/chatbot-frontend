@@ -158,7 +158,7 @@ if st.session_state.get("logged_in"):
         st.Page(
             page=chat_page.render,
             title=chat_page.title,
-            url_path=f"{chat_page.thread_id}"
+            url_path=str(chat_page.thread_id)
         ) for chat_page in reversed(chat_pages)
     ]
 
