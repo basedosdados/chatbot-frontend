@@ -22,11 +22,14 @@ class ChatPage:
         self.page_id = str(uuid.uuid4())
         self.logger = logger.bind(classname=self.__class__.__name__)
 
-    def _create_thread_and_register(self, title: str):
+    def _create_thread_and_register(self, title: str) -> bool:
         """Create a thread for this chat page and add itself to the chat pages list
 
         Args:
             title (str): The thread title
+
+        Returns:
+            bool: Whether the thread creation was successful
         """
         thread = self.api.create_thread(
             access_token=st.session_state["access_token"],
@@ -38,8 +41,10 @@ class ChatPage:
             self.thread_id = thread.id
             chat_pages: list[ChatPage] = st.session_state["chat_pages"]
             chat_pages.append(self)
+            return True
         else:
-            show_error_popup("Não foi possível criar a thread.")
+            show_error_popup("Não foi possível criar a thread. Por favor, inicie uma nova conversa.")
+            return False
 
     def _handle_click_feedback(self, feedback_id: str, show_comments_id: str):
         """Update the feedback buttons state and the comments text input flag on session state
@@ -335,7 +340,14 @@ class ChatPage:
 
                 # Create thread only in the first message
                 if self.thread_id is None:
-                    self._create_thread_and_register(title=user_prompt)
+                    created = self._create_thread_and_register(title=user_prompt)
+
+                if not created:
+                    # Setting this flag to False doesn't seem necessary here, but it might
+                    # prevent unexpected issues. Keeping it for safety until the underlying
+                    # behavior is better understood.
+                    st.session_state[self.waiting_key] = False
+                    return
 
                 message_pair = self.api.send_message(
                     access_token=st.session_state["access_token"],

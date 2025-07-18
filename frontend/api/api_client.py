@@ -113,7 +113,7 @@ class APIClient:
             )
             response.raise_for_status()
             message_pairs = [MessagePair(**pair) for pair in response.json()]
-            self.logger.success(f"[MESSAGE] Message pairs retrived successfully for thread {thread_id}")
+            self.logger.success(f"[MESSAGE] Message pairs retrieved successfully for thread {thread_id}")
             return message_pairs
         except requests.RequestException:
             self.logger.exception(f"[MESSAGE] Error on message pairs retrieval for thread {thread_id}:")
