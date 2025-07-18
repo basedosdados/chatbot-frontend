@@ -141,8 +141,6 @@ def about():
     st.subheader(":gray[:material/info:] Importante")
     st.info("Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.")
 
-login_page = st.Page(page=login, title="Entrar", icon=":material/login:")
-
 if st.session_state.get("logged_in"):
     about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
     logout_page = st.Page(page=logout, title="Sair", icon=":material/logout:")
@@ -173,6 +171,7 @@ if st.session_state.get("logged_in"):
 
     page = st.navigation(sections)
 else:
+    login_page = st.Page(page=login, title="Entrar", icon=":material/login:")
     page = st.navigation(pages=[login_page], position="hidden")
 
 page.run()
