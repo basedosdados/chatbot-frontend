@@ -12,14 +12,14 @@ class APIClient:
         self.logger = logger.bind(classname=self.__class__.__name__)
 
     def authenticate(self, email: str, password: str) -> tuple[str|None, str]:
-        """Send a post request to the authentication endpoint
+        """Send a post request to the authentication endpoint.
 
         Args:
-            email (str): The email
-            password (str): The password
+            email (str): The email.
+            password (str): The password.
 
         Returns:
-            tuple[str|None, str]: A tuple containing the access token and a status message
+            tuple[str|None, str]: A tuple containing the access token and a status message.
         """
         access_token = None
 
@@ -53,49 +53,87 @@ class APIClient:
 
         return access_token, message
 
-    def create_thread(self, access_token: str) -> UUID|None:
-        """Create a thread
+    def create_thread(self, access_token: str, title: str) -> Thread|None:
+        """Create a thread.
 
         Args:
-            access_token (str): User access token
+            access_token (str): User access token.
+            title (str): The thread title.
 
         Returns:
-            UUID|None: Thread unique identifier if the thread was created successfully. None otherwise
+            Thread|None: A Thread object if the thread was created successfully. None otherwise.
         """
         self.logger.info("[THREAD] Creating thread")
 
         try:
             response = requests.post(
                 url=f"{self.base_url}/chatbot/threads/",
-                headers={"Authorization": f"Bearer {access_token}"}
+                json={"title": title},
+                headers={"Authorization": f"Bearer {access_token}"},
             )
             response.raise_for_status()
             thread = Thread(**response.json())
-            self.logger.success(f"[MESSAGE] Thread created successfully for user {thread.id}")
-            return thread.id
+            self.logger.success(f"[THREAD] Thread created successfully for user {thread.account}")
+            return thread
         except requests.RequestException:
-            self.logger.exception(f"[MESSAGE] Error on thread creation:")
+            self.logger.exception(f"[THREAD] Error on thread creation:")
+            return None
+
+    def get_threads(self, access_token: str) -> list[Thread]|None:
+        """Get all threads from a user.
+
+        Args:
+            access_token (str): User access token.
+
+        Returns:
+            list[Thread]|None: A list of Thread objects if any thread was found. None otherwise.
+        """
+        self.logger.info("[THREAD] Retrieving threads")
+        try:
+            response = requests.get(
+                url=f"{self.base_url}/chatbot/threads/",
+                params={"order_by": "created_at"},
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            response.raise_for_status()
+            threads = [Thread(**thread) for thread in response.json()]
+            self.logger.success(f"[THREAD] Threads retrieved successfully")
+            return threads
+        except requests.RequestException:
+            self.logger.exception(f"[THREAD] Error on threads retrieval:")
+            return None
+
+    def get_message_pairs(self, access_token: str, thread_id: UUID) -> list[MessagePair]|None:
+        self.logger.info(f"[MESSAGE] Retrieving message pairs for thread {thread_id}")
+        try:
+            response = requests.get(
+                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
+                params={"order_by": "created_at"},
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+            response.raise_for_status()
+            message_pairs = [MessagePair(**pair) for pair in response.json()]
+            self.logger.success(f"[MESSAGE] Message pairs retrieved successfully for thread {thread_id}")
+            return message_pairs
+        except requests.RequestException:
+            self.logger.exception(f"[MESSAGE] Error on message pairs retrieval for thread {thread_id}:")
             return None
 
     def send_message(self, access_token: str, message: str, thread_id: UUID) -> MessagePair:
-        """Send a user message
+        """Send a user message.
 
         Args:
-            access_token (str): User access token
-            message (str): User message
-            thread_id (UUID): Thread unique identifier
+            access_token (str): User access token.
+            message (str): User message.
+            thread_id (UUID): Thread unique identifier.
 
         Returns:
             MessagePair:
                 A MessagePair object containing:
                     - id: unique identifier
-                    - thread: thread unique identifier
-                    - model_uri: assistant's model URI
                     - user_message: user message
                     - assistant_message: assistant message
                     - generated_queries: generated sql queries
-                    - generated_chart: generated data for visualization
-                    - created_at: message pair creation timestamp
         """
         user_message = UserMessage(content=message)
 
@@ -113,8 +151,6 @@ class APIClient:
         except requests.RequestException:
             self.logger.exception(f"[MESSAGE] Error on sending user message:")
             message_pair = {
-                "thread": thread_id,
-                "model_uri": "",
                 "user_message": user_message.content,
                 "assistant_message": "Ops, algo deu errado! Por favor, tente novamente. "\
                     "Se o problema persistir, avise-nos. Obrigado pela paciência!"
@@ -123,16 +159,16 @@ class APIClient:
         return MessagePair(**message_pair)
 
     def send_feedback(self, access_token: str, message_pair_id: UUID, rating: int, comments: str) -> bool:
-        """Send a feedback
+        """Send a feedback.
 
         Args:
-            access_token (str): User access token
-            message_pair_id (UUID): The message pair unique identifier
-            rating (int): The rating (0 or 1)
-            comments (str): The comments
+            access_token (str): User access token.
+            message_pair_id (UUID): The message pair unique identifier.
+            rating (int): The rating (0 or 1).
+            comments (str): The comments.
 
         Returns:
-            bool: Whether the operation succeeded or not
+            bool: Whether the operation succeeded or not.
         """
         feedback_meaning = "positive" if rating else "negative"
 
@@ -154,21 +190,21 @@ class APIClient:
             self.logger.exception(f"[FEEDBACK] Error on sending feedback:")
             return False
 
-    def clear_thread(self, access_token: str, thread_id: UUID) -> bool:
-        """Clear a thread
+    def delete_thread(self, access_token: str, thread_id: UUID) -> bool:
+        """Soft delete a thread and hard delete all its checkpoints.
 
         Args:
-            access_token (str): User access token
-            thread_id (UUID): Thread unique identifier
+            access_token (str): User access token.
+            thread_id (UUID): Thread unique identifier.
 
         Returns:
-            bool: Whether the operation succeeded or not
+            bool: Whether the operation succeeded or not.
         """
         self.logger.info(f"""[CLEAR] Clearing assistant memory""")
 
         try:
             response = requests.delete(
-                url=f"{self.base_url}/chatbot/checkpoints/{thread_id}/",
+                url=f"{self.base_url}/chatbot/threads/{thread_id}/",
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
