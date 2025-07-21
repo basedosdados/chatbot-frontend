@@ -321,7 +321,7 @@ class ChatPage:
             with st.chat_message("assistant", avatar=AVATARS["assistant"]):
                 st.empty()
 
-                if not message_pair.error_message:
+                if message_pair.assistant_message:
                     label = "Concluído!"
                     state = "complete"
                 else:
@@ -332,7 +332,7 @@ class ChatPage:
                     for step in message_pair.safe_steps:
                         st.caption(step.content)
 
-                if not message_pair.error_message:
+                if message_pair.assistant_message:
                     st.write(message_pair.assistant_message)
                     self._render_message_buttons(message_pair)
                 else:
@@ -373,7 +373,7 @@ class ChatPage:
                             st.caption(step.content)
                         elif streaming_status == "complete":
                             message_pair: MessagePair = message
-                            if not message_pair.error_message:
+                            if message_pair.assistant_message:
                                 label = "Concluído!"
                                 state = "complete"
                             else:
@@ -381,7 +381,7 @@ class ChatPage:
                                 state = "error"
                             status.update(label=label, state=state)
 
-                if not message_pair.error_message:
+                if message_pair.assistant_message:
                     # Render the assistant message and message buttons
                     _ = st.write_stream(message_pair.stream_words)
                     self._render_message_buttons(message_pair)
