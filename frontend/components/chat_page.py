@@ -104,14 +104,6 @@ class ChatPage:
 
         st.session_state[show_comments_id] = False
 
-    def _toggle_flag(self, flag_id: str):
-        """Toggle a flag on session state
-
-        Args:
-            flag_id (str): The flag identifier
-        """
-        st.session_state[flag_id] = not st.session_state[flag_id]
-
     def _render_message_buttons(self, message_pair: MessagePair):
         """Render the code-showing button and all the feedback related widgets on assistant's messages.
 
@@ -121,6 +113,7 @@ class ChatPage:
                     - id: unique identifier.
                     - user_message: user message.
                     - assistant_message: assistant message.
+                    - error_message: error message.
                     - generated_queries: generated sql queries.
         """
         # Placeholder for showing the generated SQL queries
@@ -176,7 +169,7 @@ class ChatPage:
                 st.button(
                     " ",
                     key=show_code_btn_id,
-                    on_click=self._toggle_flag,
+                    on_click=toggle_flag,
                     args=(show_code_id,),
                     disabled=waiting_for_answer
                 )
@@ -273,7 +266,7 @@ class ChatPage:
         st.session_state[self.page_id][self.waiting_key] = True
 
     def render(self):
-        """Render the chat page"""
+        """Render the chat page."""
         # Unfortunately, this is necessary for the code-showing button customization
         st.markdown(
             """<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>""",
@@ -426,7 +419,22 @@ class ChatPage:
 
 @st.dialog("Erro")
 def show_error_popup(message: str):
+    """Display an error message in a modal.
+
+    Args:
+        message (str): The error message.
+    """
     st.text(message)
 
 def clear_new_chat_page():
+    """Clear new chat page on session state.
+    """
     st.session_state[NEW_CHAT] = None
+
+def toggle_flag(flag_id: str):
+    """Toggle a flag on session state.
+
+    Args:
+        flag_id (str): The flag identifier.
+    """
+    st.session_state[flag_id] = not st.session_state[flag_id]
