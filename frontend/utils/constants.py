@@ -1,13 +1,30 @@
 # API variables
-API_HOST = "api-development-service"
-API_PORT = 80
+API_HOST = "localhost"
+API_PORT = 8000
 BASE_URL = f"http://{API_HOST}:{API_PORT}" # Base API URL
 
-# Log configuration variables
+# Set log sink.
 LOG_FILE_PATH = "/var/log/chatbot/frontend.log"
+
+# Set log level.
 LOG_LEVEL = "DEBUG"
-LOG_ROTATION = "1 day" # Rotate logs daily.
-LOG_RETENTION = None   # Don't delete old logs.
-LOG_BACKTRACE = True   # Whether the full stacktrace should be shown when logging exceptions.
-LOG_DIAGNOSE = False   # Whether exception traces should display the variables values, for debugging. Should be se to False in production.
-LOG_ENQUEUE = True     # Whether the messages to be logged should first pass through a multiprocessing-safe queue before reaching the sink.
+
+# Rotate logs daily.
+LOG_ROTATION = "1 day"
+
+# Don't delete old logs.
+LOG_RETENTION = None
+
+# Whether the full stacktrace should be shown when logging exceptions.
+LOG_BACKTRACE = True
+
+# Whether exception traces should display the variables values,
+# for debugging. Should be se to False in production.
+LOG_DIAGNOSE = False
+
+# Whether the messages to be logged should first pass through
+# a multiprocessing-safe queue before reaching the sink.
+LOG_ENQUEUE = True
+
+# Key for storing an empty chat page in the session state.
+NEW_CHAT = "new_chat"

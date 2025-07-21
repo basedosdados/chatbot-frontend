@@ -6,6 +6,7 @@ from loguru import logger
 from frontend.api import APIClient
 from frontend.components import *
 from frontend.datatypes import MessagePair, Step
+from frontend.utils.constants import NEW_CHAT
 from frontend.utils.icons import AVATARS
 
 
@@ -80,7 +81,7 @@ class ChatPage:
         feedback_id: str,
         message_pair_id: uuid.UUID,
         show_comments_id: str,
-        comments: str
+        comments: str | None
     ):
         """Handle feedback sending.
 
@@ -88,7 +89,7 @@ class ChatPage:
             feedback_id (str): The feedback id.
             message_pair_id (UUID): The message pair id.
             show_comments_id (str): The show_comments flag id.
-            comments (str): The comments.
+            comments (str | None): The comments.
         """
         rating = st.session_state[feedback_id]
         access_token = st.session_state["access_token"]
@@ -140,7 +141,7 @@ class ChatPage:
 
         # Checks if the model is still answering the last question.
         # If yes, all message buttons and comments inputs will be disabled
-        waiting_for_answer = st.session_state[self.waiting_key]
+        waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
 
         # Unique flag and button key for code-showing
         show_code_id = f"show_code_{message_pair.id}"
@@ -269,7 +270,7 @@ class ChatPage:
         the model is answering a question and enable the chat deletion button rendering.
         """
         st.session_state[self.page_id][self.delete_btn_key] = False
-        st.session_state[self.waiting_key] = True
+        st.session_state[self.page_id][self.waiting_key] = True
 
     def render(self):
         """Render the chat page"""
@@ -286,16 +287,20 @@ class ChatPage:
         if self.page_id not in st.session_state:
             st.session_state[self.page_id] = {}
 
-        # Initialize the waiting key, which is used to prevent users from
-        # interacting with the app while the model is answering a question
-        if self.waiting_key not in st.session_state:
-            st.session_state[self.waiting_key] = False
-
         page_session_state = st.session_state[self.page_id]
 
         # Initialize feedback history
         if self.feedbacks_key not in page_session_state:
             page_session_state[self.feedbacks_key] = {}
+
+        # Initialize the waiting key, which is used to prevent users from
+        # interacting with the app while the model is answering a question
+        if self.waiting_key not in page_session_state:
+            page_session_state[self.waiting_key] = False
+
+        # Initialize chat deletion flag
+        if self.delete_btn_key not in page_session_state:
+            page_session_state[self.delete_btn_key] = self.thread_id is None
 
         # Initialize chat history state and chat deletion flag state
         if self.chat_history_key not in page_session_state:
@@ -304,12 +309,8 @@ class ChatPage:
                     access_token=st.session_state["access_token"],
                     thread_id=self.thread_id
                 )
-                # If the thread is already created, the deletion button is enabled
-                page_session_state[self.delete_btn_key] = False
             else:
                 message_pairs = []
-                # Otherwise, it is disabled
-                page_session_state[self.delete_btn_key] = True
             page_session_state[self.chat_history_key] = message_pairs or []
 
         chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
@@ -348,7 +349,7 @@ class ChatPage:
         if user_prompt := st.chat_input(
             "Faça uma pergunta!",
             on_submit=self._handle_user_interaction,
-            disabled=st.session_state[self.waiting_key]
+            disabled=page_session_state[self.waiting_key]
         ):
             # Clear subheader message
             subheader.empty()
@@ -357,17 +358,16 @@ class ChatPage:
             with st.chat_message("user", avatar=AVATARS["user"]):
                 st.write(user_prompt)
 
+            # Create thread only in the first message
+            if (
+                self.thread_id is None and not
+                self._create_thread_and_register(title=user_prompt)
+            ):
+                clear_new_chat_page()
+                return
+
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=AVATARS["assistant"]):
-                # Create thread only in the first message
-                if self.thread_id is None:
-                    if not self._create_thread_and_register(title=user_prompt):
-                        # Setting this flag to False doesn't seem necessary here, but it might
-                        # prevent unexpected issues. Keeping it for safety until the underlying
-                        # behavior is better understood.
-                        st.session_state[self.waiting_key] = False
-                        return
-
                 with st.status("Consultando banco de dados...") as status:
                     for streaming_status, message in self.api.send_message(
                         access_token=st.session_state["access_token"],
@@ -404,15 +404,29 @@ class ChatPage:
         # Render the disclaimer messages
         render_disclaimer()
 
-        if st.session_state[self.waiting_key]:
-            st.session_state[self.waiting_key] = False
-            current_page = st.Page(
-                page=self.render,
-                title=self.title,
-                url_path=str(self.thread_id)
-            )
-            st.switch_page(current_page)
+        if page_session_state[self.waiting_key]:
+            page_session_state[self.waiting_key] = False
+
+            new_chat: ChatPage | None = st.session_state[NEW_CHAT]
+
+            # If this page is a new chat page, switch to it
+            if new_chat and new_chat.page_id == self.page_id:
+                clear_new_chat_page()
+
+                current_page = st.Page(
+                    page=self.render,
+                    title=self.title,
+                    url_path=str(self.thread_id)
+                )
+
+                st.switch_page(current_page)
+            # Otherwise, we're already on it, so just rerun
+            else:
+                st.rerun()
 
 @st.dialog("Erro")
 def show_error_popup(message: str):
     st.text(message)
+
+def clear_new_chat_page():
+    st.session_state[NEW_CHAT] = None
