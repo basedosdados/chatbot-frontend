@@ -295,7 +295,7 @@ class ChatPage:
         if self.delete_btn_key not in page_session_state:
             page_session_state[self.delete_btn_key] = self.thread_id is None
 
-        # Initialize chat history state and chat deletion flag state
+        # Initialize chat history state
         if self.chat_history_key not in page_session_state:
             if self.thread_id is not None:
                 message_pairs = self.api.get_message_pairs(
