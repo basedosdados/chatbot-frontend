@@ -1,6 +1,6 @@
 # API variables
-API_HOST = "localhost"
-API_PORT = 8000
+API_HOST = "api-development-service"
+API_PORT = 80
 BASE_URL = f"http://{API_HOST}:{API_PORT}" # Base API URL
 
 # Set log sink.
