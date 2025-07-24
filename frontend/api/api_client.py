@@ -1,9 +1,11 @@
+import json
+from typing import Iterator
 from uuid import UUID
 
-import requests
+import httpx
 from loguru import logger
 
-from frontend.datatypes import MessagePair, Thread, UserMessage
+from frontend.datatypes import MessagePair, Step, Thread, UserMessage
 
 
 class APIClient:
@@ -26,7 +28,7 @@ class APIClient:
         message = "Ops! Ocorreu um erro durante o login. Por favor, tente novamente."
 
         try:
-            response = requests.post(
+            response = httpx.post(
                 url=f"{self.base_url}/chatbot/token/",
                 data={
                     "email": email,
@@ -42,13 +44,13 @@ class APIClient:
                 message = "Conectado com sucesso!"
             else:
                 self.logger.error(f"[LOGIN] No access token returned")
-        except requests.exceptions.HTTPError:
-            if response.status_code == requests.codes.unauthorized:
+        except httpx.HTTPStatusError:
+            if response.status_code == httpx.codes.UNAUTHORIZED:
                 self.logger.warning(f"[LOGIN] Invalid credentials")
                 message = "Usuário ou senha incorretos."
             else:
                 self.logger.exception(f"[LOGIN] HTTP error:")
-        except requests.exceptions.RequestException:
+        except Exception:
             self.logger.exception(f"[LOGIN] Login error:")
 
         return access_token, message
@@ -66,7 +68,7 @@ class APIClient:
         self.logger.info("[THREAD] Creating thread")
 
         try:
-            response = requests.post(
+            response = httpx.post(
                 url=f"{self.base_url}/chatbot/threads/",
                 json={"title": title},
                 headers={"Authorization": f"Bearer {access_token}"},
@@ -75,7 +77,7 @@ class APIClient:
             thread = Thread(**response.json())
             self.logger.success(f"[THREAD] Thread created successfully for user {thread.account}")
             return thread
-        except requests.RequestException:
+        except Exception:
             self.logger.exception(f"[THREAD] Error on thread creation:")
             return None
 
@@ -90,7 +92,7 @@ class APIClient:
         """
         self.logger.info("[THREAD] Retrieving threads")
         try:
-            response = requests.get(
+            response = httpx.get(
                 url=f"{self.base_url}/chatbot/threads/",
                 params={"order_by": "created_at"},
                 headers={"Authorization": f"Bearer {access_token}"}
@@ -99,14 +101,14 @@ class APIClient:
             threads = [Thread(**thread) for thread in response.json()]
             self.logger.success(f"[THREAD] Threads retrieved successfully")
             return threads
-        except requests.RequestException:
+        except Exception:
             self.logger.exception(f"[THREAD] Error on threads retrieval:")
             return None
 
     def get_message_pairs(self, access_token: str, thread_id: UUID) -> list[MessagePair]|None:
         self.logger.info(f"[MESSAGE] Retrieving message pairs for thread {thread_id}")
         try:
-            response = requests.get(
+            response = httpx.get(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
                 params={"order_by": "created_at"},
                 headers={"Authorization": f"Bearer {access_token}"}
@@ -115,48 +117,78 @@ class APIClient:
             message_pairs = [MessagePair(**pair) for pair in response.json()]
             self.logger.success(f"[MESSAGE] Message pairs retrieved successfully for thread {thread_id}")
             return message_pairs
-        except requests.RequestException:
+        except Exception:
             self.logger.exception(f"[MESSAGE] Error on message pairs retrieval for thread {thread_id}:")
             return None
 
-    def send_message(self, access_token: str, message: str, thread_id: UUID) -> MessagePair:
-        """Send a user message.
+    def send_message(self, access_token: str, message: str, thread_id: UUID) -> Iterator[tuple[str, Step|MessagePair]]:
+        """Send a user message and stream the assistant's response.
 
         Args:
-            access_token (str): User access token.
-            message (str): User message.
-            thread_id (UUID): Thread unique identifier.
+            access_token (str): The user's access token.
+            message (str): The message sent by the user.
+            thread_id (UUID): The unique identifier of the thread.
 
-        Returns:
-            MessagePair:
-                A MessagePair object containing:
-                    - id: unique identifier
-                    - user_message: user message
-                    - assistant_message: assistant message
-                    - generated_queries: generated sql queries
+        Yields:
+            Iterator[tuple[str, Step|MessagePair]]: Tuples containing a status message and either a `Step` or `MessagePair` object.
+                While streaming, `Step` objects are yielded. Once streaming is complete, a final `MessagePair` is yielded.
         """
         user_message = UserMessage(content=message)
 
         self.logger.info(f"[MESSAGE] Sending message {user_message.id} in thread {thread_id}")
 
-        try:
-            response = requests.post(
-                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
-                json=user_message.model_dump(mode="json"),
-                headers={"Authorization": f"Bearer {access_token}"}
-            )
-            response.raise_for_status()
-            self.logger.success(f"[MESSAGE] User message sent successfully")
-            message_pair = response.json()
-        except requests.RequestException:
-            self.logger.exception(f"[MESSAGE] Error on sending user message:")
-            message_pair = {
-                "user_message": user_message.content,
-                "assistant_message": "Ops, algo deu errado! Por favor, tente novamente. "\
-                    "Se o problema persistir, avise-nos. Obrigado pela paciência!"
-            }
+        steps = []
 
-        return MessagePair(**message_pair)
+        try:
+            with httpx.stream(
+                method="POST",
+                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
+                headers={"Authorization": f"Bearer {access_token}"},
+                json=user_message.model_dump(mode="json"),
+                timeout=httpx.Timeout(5.0, read=300.0),
+            ) as response:
+                response.raise_for_status()
+
+                self.logger.success(f"[MESSAGE] User message sent successfully")
+
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+
+                    payload = json.loads(line)
+                    streaming_status = payload["status"]
+                    data = payload["data"]
+
+                    if streaming_status == "running":
+                        message = Step.model_validate_json(data)
+                        steps.append(message)
+                    elif streaming_status == "complete":
+                        data["steps"] = steps
+                        message = MessagePair(**data)
+
+                    yield streaming_status, message
+        except httpx.ReadTimeout:
+            self.logger.exception(f"[MESSAGE] Timeout error on sending user message:")
+            message = MessagePair(
+                user_message=user_message.content,
+                error_message=(
+                    "Ops, parece que a solicitação expirou! Por favor, tente novamente. "
+                    "Se o problema persistir, avise-nos. Obrigado pela paciência!"
+                ),
+                steps=steps or [],
+            )
+            yield "complete", message
+        except Exception:
+            self.logger.exception(f"[MESSAGE] Error on sending user message:")
+            message = MessagePair(
+                user_message=user_message.content,
+                error_message=(
+                    "Ops, algo deu errado! Por favor, tente novamente. "
+                    "Se o problema persistir, avise-nos. Obrigado pela paciência!"
+                ),
+                steps=steps or [],
+            )
+            yield "complete", message
 
     def send_feedback(self, access_token: str, message_pair_id: UUID, rating: int, comments: str) -> bool:
         """Send a feedback.
@@ -175,7 +207,7 @@ class APIClient:
         self.logger.info(f"[FEEDBACK] Sending {feedback_meaning} feedback for message pair {message_pair_id}")
 
         try:
-            response = requests.put(
+            response = httpx.put(
                 url=f"{self.base_url}/chatbot/message-pairs/{message_pair_id}/feedbacks/",
                 json={
                     "rating": rating,
@@ -186,7 +218,7 @@ class APIClient:
             response.raise_for_status()
             self.logger.success(f"[FEEDBACK] Feedback sent successfully")
             return True
-        except requests.exceptions.RequestException:
+        except Exception:
             self.logger.exception(f"[FEEDBACK] Error on sending feedback:")
             return False
 
@@ -203,13 +235,13 @@ class APIClient:
         self.logger.info(f"""[CLEAR] Clearing assistant memory""")
 
         try:
-            response = requests.delete(
+            response = httpx.delete(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/",
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
             self.logger.success(f"[CLEAR] Assistant memory cleared successfully")
             return True
-        except requests.exceptions.RequestException:
+        except Exception:
             self.logger.exception("[CLEAR] Error on clearing assistant memory:")
             return False

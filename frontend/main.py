@@ -7,7 +7,9 @@ from loguru import logger
 
 from frontend.api import APIClient
 from frontend.components.chat_page import ChatPage
-from frontend.utils.constants import *
+from frontend.utils.constants import (BASE_URL, LOG_BACKTRACE, LOG_DIAGNOSE,
+                                      LOG_ENQUEUE, LOG_FILE_PATH, LOG_LEVEL,
+                                      LOG_RETENTION, LOG_ROTATION, NEW_CHAT)
 from frontend.utils.icons import AVATARS
 
 
@@ -145,11 +147,14 @@ if st.session_state.get("logged_in"):
     about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
     logout_page = st.Page(page=logout, title="Sair", icon=":material/logout:")
 
+    if not st.session_state.get(NEW_CHAT):
+        new_chat = ChatPage(api)
+        st.session_state[NEW_CHAT] = new_chat
+    else:
+        new_chat = st.session_state[NEW_CHAT]
+
     new_chat_page = st.Page(
-        page=ChatPage(api).render,
-        title="Nova conversa",
-        icon=":material/add:",
-        default=True
+        page=new_chat.render, title="Nova conversa", icon=":material/add:", default=True
     )
 
     chat_pages: list[ChatPage] = st.session_state.get("chat_pages", [])
