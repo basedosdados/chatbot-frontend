@@ -138,6 +138,8 @@ class APIClient:
         self.logger.info(f"[MESSAGE] Sending message {user_message.id} in thread {thread_id}")
 
         steps = []
+        error_message = None
+        stream_completed = False
 
         try:
             with httpx.stream(
@@ -165,27 +167,34 @@ class APIClient:
                     elif streaming_status == "complete":
                         data["steps"] = steps
                         message = MessagePair(**data)
+                        stream_completed = True
 
                     yield streaming_status, message
         except httpx.ReadTimeout:
             self.logger.exception(f"[MESSAGE] Timeout error on sending user message:")
-            message = MessagePair(
-                user_message=user_message.content,
-                error_message=(
-                    "Ops, parece que a solicitação expirou! Por favor, tente novamente. "
-                    "Se o problema persistir, avise-nos. Obrigado pela paciência!"
-                ),
-                steps=steps or [],
+            error_message=(
+                "Ops, parece que a solicitação expirou! Por favor, tente novamente. "
+                "Se o problema persistir, avise-nos. Obrigado pela paciência!"
             )
-            yield "complete", message
         except Exception:
             self.logger.exception(f"[MESSAGE] Error on sending user message:")
+            error_message=(
+                "Ops, algo deu errado! Por favor, tente novamente. "
+                "Se o problema persistir, avise-nos. Obrigado pela paciência!"
+            )
+
+        # Safeguard for unexpected stream termination. Handles cases where the server
+        # crashes ands the httpx.stream() call ends silently without raising an exception.
+        if not stream_completed:
+            if not error_message:
+                self.logger.error("[MESSAGE] Stream terminated without a 'complete' status")
+                error_message=(
+                    "Ops, a conexão com o servidor foi interrompida inesperadamente! "
+                    "Por favor, tente novamente mais tarde. Se o problema persistir, avise-nos."
+                )
             message = MessagePair(
                 user_message=user_message.content,
-                error_message=(
-                    "Ops, algo deu errado! Por favor, tente novamente. "
-                    "Se o problema persistir, avise-nos. Obrigado pela paciência!"
-                ),
+                error_message=error_message,
                 steps=steps or [],
             )
             yield "complete", message
