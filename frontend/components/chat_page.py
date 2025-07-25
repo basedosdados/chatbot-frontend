@@ -361,7 +361,7 @@ class ChatPage:
 
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=AVATARS["assistant"]):
-                with st.status("Consultando banco de dados...") as status:
+                with st.status("Processando sua solicitação...") as status:
                     for streaming_status, message in self.api.send_message(
                         access_token=st.session_state["access_token"],
                         message=user_prompt,
