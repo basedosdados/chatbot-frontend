@@ -4,13 +4,16 @@ WORKDIR /app/frontend
 
 COPY . .
 
-RUN pip install --upgrade pip && \
-    pip install --user pipx
+# Install curl
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
+# Install Poetry and add it to PATH
+RUN curl -sSL https://install.python-poetry.org | python3 - --version 2.1.3
 ENV PATH="/root/.local/bin:$PATH"
 
-RUN pipx install poetry==2.1.3 && \
-    poetry install --only main
+# Install project
+RUN poetry install --only main
 
 EXPOSE 8501
 
