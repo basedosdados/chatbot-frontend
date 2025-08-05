@@ -76,8 +76,8 @@ jobs:
                 nginx.ingress.kubernetes.io/ssl-redirect: "true"
                 cert-manager.io/issuer: letsencrypt-production
                 nginx.ingress.kubernetes.io/configuration-snippet: |
-                  # Redirect exact /chatbot → /chatbot/ with a 301
-                  rewrite ^/chatbot$ /chatbot/ permanent;
+                  # Redirect exact /chatbot-streamlit → /chatbot-streamlit/ with a 301
+                  rewrite ^/chatbot-streamlit$ /chatbot-streamlit/ permanent;
               tls:
                 - hosts:
                     - development.basedosdados.org
