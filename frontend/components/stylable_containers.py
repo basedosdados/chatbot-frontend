@@ -9,7 +9,7 @@ _div_chart = """
         font-family: 'Material Symbols Outlined';
         font-size: 20px;
         content: 'bar_chart';
-        color: #9c9d9f;
+        color: #7c7f84;
     }
 """
 
@@ -21,13 +21,13 @@ _div_code = """
         font-family: 'Material Symbols Outlined';
         font-size: 20px;
         content: 'code';
-        color: #9c9d9f;
+        color: #7c7f84;
     }
 """
 
 _hover = """
     button div:hover:before {
-        color: #ffffff;
+        color: #252a32;
     }
 """
 
@@ -36,7 +36,7 @@ _button = """
         width: 0;
         height: 0;
         border: none;
-        background-color: #0e1117;
+        background-color: #ffffff;
     }
 """
 

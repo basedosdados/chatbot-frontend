@@ -12,7 +12,7 @@ def render_disclaimer():
                     .disclaimer {
                         text-align: center;
                         font-size: 14px;
-                        color: #9c9d9f;
+                        color: #7c7f84;
                     }
                 </style>
                 <div class="disclaimer">
