@@ -330,7 +330,13 @@ class ChatPage:
 
                 with st.status(label=label, state=state) as status:
                     for step in message_pair.safe_steps:
-                        st.caption(step.content)
+                        if isinstance(step.content, str):
+                            st.caption(step.content)
+                        else:
+                            for content in step.content:
+                                if content.title:
+                                    st.caption(f"##### :green[{content.title}]")
+                                st.caption(content.body.strip())
 
                 if message_pair.assistant_message:
                     st.write(message_pair.assistant_message)
@@ -370,7 +376,13 @@ class ChatPage:
                         if streaming_status == "running":
                             step: Step = message
                             status.update(label=step.label)
-                            st.caption(step.content)
+                            if isinstance(step.content, str):
+                                st.caption(step.content)
+                            else:
+                                for content in step.content:
+                                    if content.title:
+                                        st.caption(f"##### :green[{content.title}]")
+                                    st.caption(content.body.strip())
                         elif streaming_status == "complete":
                             message_pair: MessagePair = message
                             if message_pair.assistant_message:

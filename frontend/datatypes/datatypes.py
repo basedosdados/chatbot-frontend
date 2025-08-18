@@ -16,9 +16,13 @@ class UserMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     content: str
 
+class StepContent(BaseModel):
+    title: str|None
+    body: str
+
 class Step(BaseModel):
     label: str
-    content: str
+    content: str|list[StepContent] # str allowed for backward compatibility
 
 class MessagePair(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
