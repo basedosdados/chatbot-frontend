@@ -2,6 +2,7 @@ import time
 import uuid
 from collections.abc import Generator
 from datetime import datetime
+from typing import Any, Literal, Optional
 
 from pydantic import UUID4, BaseModel, Field, model_validator
 
@@ -16,13 +17,33 @@ class UserMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     content: str
 
-class StepContent(BaseModel):
-    title: str|None
-    body: str
+class ToolCall(BaseModel):
+    id: str
+    name: str
+    args: dict[str, Any]
 
-class Step(BaseModel):
-    label: str
-    content: str|list[StepContent] # str allowed for backward compatibility
+class ToolOutput(BaseModel):
+    status: Literal["error", "success"]
+    tool_call_id: str
+    tool_name: str
+    output: str
+
+EventType = Literal[
+    "tool_call",
+    "tool_result",
+    "final_answer",
+    "error",
+]
+
+class EventData(BaseModel):
+    message: Optional[str] = None
+    tool_calls: Optional[list[ToolCall]] = None
+    tool_outputs: Optional[list[ToolOutput]] = None
+    error_details: Optional[dict[str, Any]] = None
+
+class StreamEvent(BaseModel):
+    type: EventType
+    data: EventData
 
 class MessagePair(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
@@ -30,7 +51,7 @@ class MessagePair(BaseModel):
     assistant_message: str|None = Field(default=None)
     error_message: str|None = Field(default=None)
     generated_queries: list[str] | None = Field(default=None)
-    steps: list[Step]|None
+    events: list[StreamEvent]|None
 
     @model_validator(mode="after")
     def validate_exactly_one_response(self) -> "MessagePair":
@@ -42,8 +63,8 @@ class MessagePair(BaseModel):
         )
 
     @property
-    def safe_steps(self) -> list[Step]:
-        return self.steps or []
+    def safe_events(self) -> list[StreamEvent]:
+        return self.events or []
 
     @property
     def stream_characters(self) -> Generator[str]:

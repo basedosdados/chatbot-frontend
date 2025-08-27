@@ -1,11 +1,13 @@
+import json
 import uuid
+from typing import Any, Literal
 
 import streamlit as st
 from loguru import logger
 
 from frontend.api import APIClient
 from frontend.components import *
-from frontend.datatypes import MessagePair, Step
+from frontend.datatypes import MessagePair, StreamEvent
 from frontend.utils.constants import NEW_CHAT
 from frontend.utils.icons import AVATARS
 
@@ -44,7 +46,7 @@ class ChatPage:
             chat_pages.append(self)
             return True
         else:
-            show_error_popup("Não foi possível criar a thread. Por favor, inicie uma nova conversa.")
+            _show_error_popup("Não foi possível criar a thread. Por favor, inicie uma nova conversa.")
             return False
 
     def _handle_click_feedback(self, feedback_id: str, show_comments_id: str):
@@ -100,7 +102,7 @@ class ChatPage:
             rating=rating,
             comments=comments
         ):
-            show_error_popup("Não foi possível enviar o feedback.")
+            _show_error_popup("Não foi possível enviar o feedback.")
 
         st.session_state[show_comments_id] = False
 
@@ -169,7 +171,7 @@ class ChatPage:
                 st.button(
                     " ",
                     key=show_code_btn_id,
-                    on_click=toggle_flag,
+                    on_click=_toggle_flag,
                     args=(show_code_id,),
                     disabled=waiting_for_answer
                 )
@@ -329,8 +331,8 @@ class ChatPage:
                     state = "error"
 
                 with st.status(label=label, state=state) as status:
-                    for step in message_pair.safe_steps:
-                        display_streaming_step(step)
+                    for event in message_pair.safe_events:
+                        _display_tool_event(event)
 
                 if message_pair.assistant_message:
                     st.write(message_pair.assistant_message)
@@ -356,30 +358,39 @@ class ChatPage:
                 self.thread_id is None and not
                 self._create_thread_and_register(title=user_prompt)
             ):
-                clear_new_chat_page()
+                _clear_new_chat_page()
                 return
 
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=AVATARS["assistant"]):
-                with st.status("Processando sua solicitação...") as status:
-                    for streaming_status, message in self.api.send_message(
+                events = []
+                with st.status("Consultando a Base dos Dados...") as status:
+                    for event in self.api.send_message(
                         access_token=st.session_state["access_token"],
                         message=user_prompt,
                         thread_id=self.thread_id
                     ):
-                        if streaming_status == "running":
-                            step: Step = message
-                            status.update(label=step.label)
-                            display_streaming_step(step)
-                        elif streaming_status == "complete":
-                            message_pair: MessagePair = message
-                            if message_pair.assistant_message:
-                                label = "Concluído!"
-                                state = "complete"
-                            else:
-                                label = "Erro"
-                                state = "error"
+                        events.append(event)
+                        if event.type == "final_answer":
+                            message_pair = MessagePair(
+                                user_message=user_prompt,
+                                assistant_message=event.data.message,
+                                events=events
+                            )
+                            label = "Concluído!"
+                            state = "complete"
                             status.update(label=label, state=state)
+                        elif event.type == "error":
+                            message_pair = MessagePair(
+                                user_message=user_prompt,
+                                error_message=event.data.error_details.get("message", "Erro"),
+                                events=events
+                            )
+                            label = "Erro"
+                            state = "error"
+                            status.update(label=label, state=state)
+                        else:
+                            _display_tool_event(event)
 
                 if message_pair.assistant_message:
                     # Render the assistant message and message buttons
@@ -404,7 +415,7 @@ class ChatPage:
 
             # If this page is a new chat page, switch to it
             if new_chat and new_chat.page_id == self.page_id:
-                clear_new_chat_page()
+                _clear_new_chat_page()
 
                 current_page = st.Page(
                     page=self.render,
@@ -418,7 +429,7 @@ class ChatPage:
                 st.rerun()
 
 @st.dialog("Erro")
-def show_error_popup(message: str):
+def _show_error_popup(message: str):
     """Display an error message in a modal.
 
     Args:
@@ -426,30 +437,73 @@ def show_error_popup(message: str):
     """
     st.text(message)
 
-def clear_new_chat_page():
+def _clear_new_chat_page():
     """Clear new chat page on session state.
     """
     st.session_state[NEW_CHAT] = None
 
-def toggle_flag(flag_id: str):
+def _toggle_flag(flag_id: str):
     """Toggle a flag on session state.
 
     Args:
-        flag_id (str): The flag identifier.
+        flag_id (str): The flag unique identifier.
     """
     st.session_state[flag_id] = not st.session_state[flag_id]
 
-def display_streaming_step(step: Step):
-    """Display a streaming step.
+def _get_code_block_height(code_block: str) -> int | Literal["content"]:
+    """Determine an appropriate display height for a code block.
 
     Args:
-        step (Step): The step to display, containing either a string
-            or a list of `StepContent` items.
+        code_block (str): The string content to be shown in a code block.
+
+    Returns:
+        int | Literal["content"]: Either a fixed pixel height or the string
+        "content" to let Streamlit size the block according to its contents.
     """
-    if isinstance(step.content, str):
-        st.caption(step.content)
-    else:
-        for content in step.content:
-            if content.title:
-                st.caption(f"##### :green[{content.title}]")
-            st.caption(content.body.strip())
+    n_lines = code_block.count("\n") + 1
+    if n_lines > 10:
+        return 256
+    return "content"
+
+def _format_tool_call_args(args: dict[str, Any]) -> str:
+    sql_query = args.get("sql_query")
+
+    if sql_query is None:
+        return json.dumps(args, indent=2, ensure_ascii=False)
+
+    sql_block = f'  "sql_query": `\n{sql_query}\n`'
+
+    return "{\n" + sql_block + "\n}"
+
+def _format_tool_call_outputs(results: str) -> str:
+    return json.dumps(
+        json.loads(results),
+        ensure_ascii=False,
+        indent=2
+    )
+
+def _display_tool_event(event: StreamEvent):
+    """Render a tool-related event in the Streamlit UI.
+
+    Displays messages, tool call arguments, and tool outputs
+    with appropriate formatting and code block sizing.
+
+    Args:
+        event (StreamEvent): The tool event to display.
+    """
+    if event.type == "tool_call":
+        if event.data.message:
+            st.markdown(event.data.message)
+        for tool_call in event.data.tool_calls:
+            st.markdown(f"**Executando ferramenta** `{tool_call.name}`")
+            code_block = f"Solicitação:\n{_format_tool_call_args(tool_call.args)}"
+            height = _get_code_block_height(code_block)
+            st.code(code_block, height=height)
+    elif event.type == "tool_result":
+        for tool_output in event.data.tool_outputs:
+            if tool_output.status == "error":
+                st.markdown(f"Erro na execução da ferramenta `{tool_output.tool_name}`")
+            else:
+                code_block = f"Resposta:\n{_format_tool_call_outputs(tool_output.output)}"
+                height = _get_code_block_height(code_block)
+                st.code(code_block, height=height)
