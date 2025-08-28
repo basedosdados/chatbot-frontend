@@ -1,6 +1,8 @@
 import json
+import time
 import uuid
-from typing import Any, Literal
+from collections.abc import Generator
+from typing import Any
 
 import streamlit as st
 from loguru import logger
@@ -324,11 +326,9 @@ class ChatPage:
                 st.empty()
 
                 if message_pair.assistant_message:
-                    label = "Concluído!"
-                    state = "complete"
+                    label, state = "Concluído!", "complete"
                 else:
-                    label = "Erro"
-                    state = "error"
+                    label, state = "Erro", "error"
 
                 with st.status(label=label, state=state) as status:
                     for event in message_pair.safe_events:
@@ -336,9 +336,10 @@ class ChatPage:
 
                 if message_pair.assistant_message:
                     st.write(message_pair.assistant_message)
-                    self._render_message_buttons(message_pair)
                 else:
                     st.error(message_pair.error_message)
+
+                self._render_message_buttons(message_pair)
 
         # Accept user input
         if user_prompt := st.chat_input(
@@ -364,6 +365,9 @@ class ChatPage:
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=AVATARS["assistant"]):
                 events = []
+                assistant_message = None
+                error_message = None
+
                 with st.status("Consultando a Base dos Dados...") as status:
                     for event in self.api.send_message(
                         access_token=st.session_state["access_token"],
@@ -372,32 +376,32 @@ class ChatPage:
                     ):
                         events.append(event)
                         if event.type == "final_answer":
-                            message_pair = MessagePair(
-                                user_message=user_prompt,
-                                assistant_message=event.data.message,
-                                events=events
-                            )
-                            label = "Concluído!"
-                            state = "complete"
-                            status.update(label=label, state=state)
+                            assistant_message = event.data.content
+                            label, state = "Concluído!", "complete"
                         elif event.type == "error":
+                            error_message = event.data.error_details.get("message", "Erro")
+                            label, state = "Erro", "error"
+                        elif event.type == "complete":
                             message_pair = MessagePair(
+                                id=event.data.run_id,
                                 user_message=user_prompt,
-                                error_message=event.data.error_details.get("message", "Erro"),
+                                assistant_message=assistant_message,
+                                error_message=error_message,
                                 events=events
                             )
-                            label = "Erro"
-                            state = "error"
                             status.update(label=label, state=state)
                         else:
                             _display_tool_event(event)
 
                 if message_pair.assistant_message:
-                    # Render the assistant message and message buttons
-                    _ = st.write_stream(message_pair.stream_words)
-                    self._render_message_buttons(message_pair)
+                    st.write_stream(message_pair.stream_words)
                 else:
                     st.error(message_pair.error_message)
+
+                # Render buttons immediately to ensure a complete UI before the reload.
+                # NOTE: These specific buttons are discarded on the st.rerun() below,
+                # and then re-rendered from the chat history on the next pass.
+                self._render_message_buttons(message_pair)
 
             # Add message pair to chat history
             chat_history.append(message_pair)
@@ -428,6 +432,7 @@ class ChatPage:
             else:
                 st.rerun()
 
+
 @st.dialog("Erro")
 def _show_error_popup(message: str):
     """Display an error message in a modal.
@@ -437,10 +442,11 @@ def _show_error_popup(message: str):
     """
     st.text(message)
 
+
 def _clear_new_chat_page():
-    """Clear new chat page on session state.
-    """
+    """Clear new chat page on session state."""
     st.session_state[NEW_CHAT] = None
+
 
 def _toggle_flag(flag_id: str):
     """Toggle a flag on session state.
@@ -450,22 +456,57 @@ def _toggle_flag(flag_id: str):
     """
     st.session_state[flag_id] = not st.session_state[flag_id]
 
-def _get_code_block_height(code_block: str) -> int | Literal["content"]:
-    """Determine an appropriate display height for a code block.
+
+def _stream_words(message: str) -> Generator[str]:
+    """Stream words from a message with a typing effect.
 
     Args:
-        code_block (str): The string content to be shown in a code block.
+        message (str): The message to stream.
 
-    Returns:
-        int | Literal["content"]: Either a fixed pixel height or the string
-        "content" to let Streamlit size the block according to its contents.
+    Yields:
+        Generator[str]: The next word followed by a space.
+    """
+    for word in message.split(" "):
+        yield word + " "
+        time.sleep(0.02)
+
+
+def _display_code_block(code_block: str, max_lines: int=10, max_height: int=256):
+    """Display a code block in Streamlit with adaptive height.
+
+    If the code block has more lines than `max_lines`, the display height
+    is capped at `max_height`. Otherwise, the height is set to "content",
+    letting Streamlit adjust dynamically.
+
+    Args:
+        code_block (str): The code content to display.
+        max_lines (int, optional): Threshold for the maximum number of lines
+            before capping the height. Defaults to 10.
+        max_height (int, optional): Maximum height in pixels for code blocks
+            exceeding `max_lines`. Defaults to 256.
     """
     n_lines = code_block.count("\n") + 1
-    if n_lines > 10:
-        return 256
-    return "content"
 
-def _format_tool_call_args(args: dict[str, Any]) -> str:
+    if n_lines > max_lines:
+        height = max_height
+    else:
+        height = "content"
+
+    st.code(code_block, height=height)
+
+
+def _format_tool_args(args: dict[str, Any]) -> str:
+    """Format tool call arguments for display.
+
+    Expands sql queries arguments into multiline blocks for readability.
+    Otherwise pretty-prints the arguments as JSON.
+
+    Args:
+        args (dict[str, Any]): Tool call arguments.
+
+    Returns:
+        str: A JSON-like string representation of the arguments.
+    """
     sql_query = args.get("sql_query")
 
     if sql_query is None:
@@ -475,12 +516,22 @@ def _format_tool_call_args(args: dict[str, Any]) -> str:
 
     return "{\n" + sql_block + "\n}"
 
-def _format_tool_call_outputs(results: str) -> str:
+
+def _format_tool_outputs(results: str) -> str:
+    """Pretty-print tool call outputs.
+
+    Args:
+        results (str): Tool call results as a JSON string.
+
+    Returns:
+        str: Formatted JSON string.
+    """
     return json.dumps(
         json.loads(results),
         ensure_ascii=False,
         indent=2
     )
+
 
 def _display_tool_event(event: StreamEvent):
     """Render a tool-related event in the Streamlit UI.
@@ -492,18 +543,16 @@ def _display_tool_event(event: StreamEvent):
         event (StreamEvent): The tool event to display.
     """
     if event.type == "tool_call":
-        if event.data.message:
-            st.markdown(event.data.message)
+        if event.data.content:
+            st.markdown(event.data.content)
         for tool_call in event.data.tool_calls:
             st.markdown(f"**Executando ferramenta** `{tool_call.name}`")
-            code_block = f"Solicitação:\n{_format_tool_call_args(tool_call.args)}"
-            height = _get_code_block_height(code_block)
-            st.code(code_block, height=height)
-    elif event.type == "tool_result":
+            tool_args = _format_tool_args(tool_call.args)
+            _display_code_block(f"Solicitação:\n{tool_args}")
+    elif event.type == "tool_output":
         for tool_output in event.data.tool_outputs:
             if tool_output.status == "error":
                 st.markdown(f"Erro na execução da ferramenta `{tool_output.tool_name}`")
             else:
-                code_block = f"Resposta:\n{_format_tool_call_outputs(tool_output.output)}"
-                height = _get_code_block_height(code_block)
-                st.code(code_block, height=height)
+                tool_outputs = _format_tool_outputs(tool_output.output)
+                _display_code_block(f"Resposta:\n{tool_outputs}")

@@ -155,9 +155,13 @@ class APIClient:
                 for line in response.iter_lines():
                     if not line:
                         continue
-                    yield StreamEvent.model_validate_json(line)
 
-                stream_completed = True
+                    event = StreamEvent.model_validate_json(line)
+
+                    if event.type == "complete":
+                        stream_completed = True
+
+                    yield event
         except httpx.ReadTimeout:
             self.logger.exception(f"[MESSAGE] Timeout error on sending user message:")
             error_message=(

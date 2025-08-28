@@ -30,13 +30,15 @@ class ToolOutput(BaseModel):
 
 EventType = Literal[
     "tool_call",
-    "tool_result",
+    "tool_output",
     "final_answer",
     "error",
+    "complete",
 ]
 
 class EventData(BaseModel):
-    message: Optional[str] = None
+    run_id: Optional[UUID4] = None
+    content: Optional[str] = None
     tool_calls: Optional[list[ToolCall]] = None
     tool_outputs: Optional[list[ToolOutput]] = None
     error_details: Optional[dict[str, Any]] = None
