@@ -1,7 +1,5 @@
 import json
-import time
 import uuid
-from collections.abc import Generator
 from typing import Any
 
 import streamlit as st
@@ -11,7 +9,7 @@ from frontend.api import APIClient
 from frontend.components import *
 from frontend.datatypes import MessagePair, StreamEvent
 from frontend.utils.constants import NEW_CHAT
-from frontend.utils.icons import AVATARS
+from frontend.utils.logos import BD_LOGO
 
 
 class ChatPage:
@@ -241,12 +239,6 @@ class ChatPage:
 
     def render(self):
         """Render the chat page."""
-        # Unfortunately, this is necessary for the code-showing button customization
-        st.markdown(
-            """<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>""",
-            unsafe_allow_html=True
-        )
-
         # Placeholder for the subheader message
         subheader = st.empty()
 
@@ -287,12 +279,14 @@ class ChatPage:
             with subheader:
                 typewrite("Como posso ajudar?")
 
+        user_avatar = st.session_state.get("user_avatar")
+
         # Display chat messages from history on app rerun
         for message_pair in chat_history:
-            with st.chat_message("user", avatar=AVATARS["user"]):
+            with st.chat_message("user", avatar=user_avatar):
                 st.write(message_pair.user_message)
 
-            with st.chat_message("assistant", avatar=AVATARS["assistant"]):
+            with st.chat_message("assistant", avatar=BD_LOGO):
                 st.empty()
 
                 if message_pair.assistant_message:
@@ -321,7 +315,7 @@ class ChatPage:
             subheader.empty()
 
             # Display user message in chat message container
-            with st.chat_message("user", avatar=AVATARS["user"]):
+            with st.chat_message("user", avatar=user_avatar):
                 st.write(user_prompt)
 
             # Create thread only in the first message
@@ -333,7 +327,7 @@ class ChatPage:
                 return
 
             # Display assistant response in chat message container
-            with st.chat_message("assistant", avatar=AVATARS["assistant"]):
+            with st.chat_message("assistant", avatar=BD_LOGO):
                 events = []
                 assistant_message = None
                 error_message = None
