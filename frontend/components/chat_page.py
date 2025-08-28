@@ -120,19 +120,15 @@ class ChatPage:
                     - error_message: error message.
                     - generated_queries: generated sql queries.
         """
-        # Placeholder for showing the generated SQL queries
-        code_placeholder = st.empty()
-
         # Container for feedback widgets
         feedback_container = st.container()
 
-        # Creates four columns:
-        # the first one is for the code-showing button
-        # the second one is for the feedback buttons
-        # the third one is for the comments input
-        # the fourth one is for the feedback sending button
-        col1, col2, col3, col4 = feedback_container.columns(
-            (0.06, 0.12, 0.93, 0.1),
+        # Creates three columns:
+        # the first one is for the feedback buttons
+        # the second one is for the comments input
+        # the thrid one is for the feedback sending button
+        col1, col2, col3 = feedback_container.columns(
+            (0.12, 1.05, 0.105),
             vertical_alignment="center"
         )
 
@@ -140,20 +136,12 @@ class ChatPage:
         # If yes, all message buttons and comments inputs will be disabled
         waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
 
-        # Unique flag and button key for code-showing
-        show_code_id = f"show_code_{message_pair.id}"
-        show_code_btn_id = f"show_code_btn_{message_pair.id}"
-
         # Unique identifiers for the feedback buttons widget
         # and for a flag that determines if the comments input should be shown
         feedback_id = f"feedback_{message_pair.id}"
         comments_input_id = f"comments_input_{message_pair.id}"
         show_comments_id = f"show_comments_{message_pair.id}"
         send_comments_id = f"send_comments_{message_pair.id}"
-
-        # By default, the codes should be hidden
-        if show_code_id not in st.session_state:
-            st.session_state[show_code_id] = False
 
         # By default, the comments input should be hidden
         if show_comments_id not in st.session_state:
@@ -167,26 +155,8 @@ class ChatPage:
             last_feedback = page_feedbacks[feedback_id]
             st.session_state[feedback_id] = last_feedback
 
-        # Renders the code-showing button
-        with col1:
-            with code_button_container():
-                st.button(
-                    " ",
-                    key=show_code_btn_id,
-                    on_click=_toggle_flag,
-                    args=(show_code_id,),
-                    disabled=waiting_for_answer
-                )
-
-        # If the code-showing flag is set, shows the generated sql queries
-        if st.session_state[show_code_id]:
-            if message_pair.generated_queries is not None:
-                code_placeholder.write(message_pair.formatted_sql_queries)
-            else:
-                code_placeholder.info("Nenhuma consulta SQL foi gerada.")
-
         # Renders the feedback buttons
-        col2.feedback(
+        col1.feedback(
             "thumbs",
             key=feedback_id,
             on_change=self._handle_click_feedback,
@@ -196,18 +166,18 @@ class ChatPage:
 
         # If the flag is set, shows the comments input and the sending button
         if st.session_state[show_comments_id]:
-            comments = col3.text_input(
+            comments = col2.text_input(
                 "comments",
                 key=comments_input_id,
                 value=None,
-                placeholder="Comentários adicionais (opcional)",
+                placeholder="Comentários (opcional)",
                 label_visibility="collapsed",
                 disabled=waiting_for_answer
             )
 
             # If the sending button is pressed, sends the feedback and comments
             # to the backend and hides the comments input and the sending button
-            col4.button(
+            col3.button(
                 ":material/send:",
                 key=send_comments_id,
                 on_click=self._handle_send_feedback,
@@ -448,29 +418,6 @@ def _clear_new_chat_page():
     st.session_state[NEW_CHAT] = None
 
 
-def _toggle_flag(flag_id: str):
-    """Toggle a flag on session state.
-
-    Args:
-        flag_id (str): The flag unique identifier.
-    """
-    st.session_state[flag_id] = not st.session_state[flag_id]
-
-
-def _stream_words(message: str) -> Generator[str]:
-    """Stream words from a message with a typing effect.
-
-    Args:
-        message (str): The message to stream.
-
-    Yields:
-        Generator[str]: The next word followed by a space.
-    """
-    for word in message.split(" "):
-        yield word + " "
-        time.sleep(0.02)
-
-
 def _display_code_block(code_block: str, max_lines: int=10, max_height: int=256):
     """Display a code block in Streamlit with adaptive height.
 
@@ -507,12 +454,12 @@ def _format_tool_args(args: dict[str, Any]) -> str:
     Returns:
         str: A JSON-like string representation of the arguments.
     """
-    sql_query = args.get("sql_query")
+    sql_query: str = args.get("sql_query", "")
 
-    if sql_query is None:
+    if not sql_query:
         return json.dumps(args, indent=2, ensure_ascii=False)
 
-    sql_block = f'  "sql_query": `\n{sql_query}\n`'
+    sql_block = f'  "sql_query": `\n{sql_query.strip()}\n`'
 
     return "{\n" + sql_block + "\n}"
 
