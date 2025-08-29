@@ -209,10 +209,7 @@ class APIClient:
         try:
             response = httpx.put(
                 url=f"{self.base_url}/chatbot/message-pairs/{message_pair_id}/feedbacks/",
-                json={
-                    "rating": rating,
-                    "comment": comments,
-                },
+                json={"rating": rating, "comment": comments},
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
@@ -237,7 +234,8 @@ class APIClient:
         try:
             response = httpx.delete(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/",
-                headers={"Authorization": f"Bearer {access_token}"}
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=httpx.Timeout(5.0, read=60.0)
             )
             response.raise_for_status()
             self.logger.success(f"[CLEAR] Assistant memory cleared successfully")
