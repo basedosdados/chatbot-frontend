@@ -1,6 +1,5 @@
 import streamlit as st
 
-
 _three_waving_dots_animation = """
     <style>
         .progress {

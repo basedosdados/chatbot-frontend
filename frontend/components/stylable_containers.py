@@ -1,6 +1,5 @@
 from streamlit_extras.stylable_container import stylable_container
 
-
 _div_chart = """
     button div:before {
         display: inline-block;
