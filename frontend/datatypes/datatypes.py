@@ -52,7 +52,6 @@ class MessagePair(BaseModel):
     user_message: str
     assistant_message: str|None = Field(default=None)
     error_message: str|None = Field(default=None)
-    generated_queries: list[str] | None = Field(default=None)
     events: list[StreamEvent]|None
 
     @model_validator(mode="after")
@@ -68,7 +67,6 @@ class MessagePair(BaseModel):
     def safe_events(self) -> list[StreamEvent]:
         return self.events or []
 
-    @property
     def stream_characters(self) -> Generator[str]:
         """Streams the assistant message character by character
 
@@ -80,7 +78,6 @@ class MessagePair(BaseModel):
                 yield character
                 time.sleep(0.01)
 
-    @property
     def stream_words(self) -> Generator[str]:
         """Streams the assistant message word by word
 
@@ -91,17 +88,3 @@ class MessagePair(BaseModel):
             for word in filter(None, self.assistant_message.split(" ")):
                 yield word + " "
                 time.sleep(0.02)
-
-    @property
-    def formatted_sql_queries(self) -> str | None:
-        """Generated SQL queries formatted as markdown code blocks
-
-        Returns:
-            str | None
-        """
-        if self.generated_queries is not None:
-            return "\n".join([
-                f"```sql\n{sql_query}\n```"
-                for sql_query in self.generated_queries
-            ])
-        return None

@@ -116,7 +116,7 @@ class ChatPage:
                     - user_message: user message.
                     - assistant_message: assistant message.
                     - error_message: error message.
-                    - generated_queries: generated sql queries.
+                    - events: list of streamed events.
         """
         # Container for feedback widgets
         feedback_container = st.container()
