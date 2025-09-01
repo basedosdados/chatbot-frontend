@@ -295,7 +295,7 @@ class ChatPage:
                     label, state = "Erro", "error"
 
                 with st.status(label=label, state=state) as status:
-                    for event in message_pair.safe_events:
+                    for event in message_pair.events:
                         _display_tool_event(event)
 
                 if message_pair.assistant_message:

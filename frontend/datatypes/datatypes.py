@@ -52,7 +52,7 @@ class MessagePair(BaseModel):
     user_message: str
     assistant_message: str|None = Field(default=None)
     error_message: str|None = Field(default=None)
-    events: list[StreamEvent]|None
+    events: list[StreamEvent]
 
     @model_validator(mode="after")
     def validate_exactly_one_response(self) -> "MessagePair":
@@ -62,10 +62,6 @@ class MessagePair(BaseModel):
             "Only one and exactly one of 'assistant_message' "
             "or 'error_message' fields must be provided"
         )
-
-    @property
-    def safe_events(self) -> list[StreamEvent]:
-        return self.events or []
 
     def stream_characters(self) -> Generator[str]:
         """Streams the assistant message character by character
