@@ -289,7 +289,7 @@ class ChatPage:
             with st.chat_message("assistant", avatar=BD_LOGO):
                 st.empty()
 
-                if message_pair.assistant_message:
+                if message_pair.assistant_message is not None:
                     label, state = "Concluído!", "complete"
                 else:
                     label, state = "Erro", "error"
@@ -298,7 +298,7 @@ class ChatPage:
                     for event in message_pair.events:
                         _display_tool_event(event)
 
-                if message_pair.assistant_message:
+                if message_pair.assistant_message is not None:
                     st.write(message_pair.assistant_message)
                 else:
                     st.error(message_pair.error_message)
