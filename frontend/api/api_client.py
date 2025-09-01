@@ -1,6 +1,5 @@
-import json
 from typing import Iterator
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 from loguru import logger
@@ -188,6 +187,11 @@ class APIClient:
             yield StreamEvent(
                 type="error",
                 data=EventData(error_details={"message": error_message})
+            )
+
+            yield StreamEvent(
+                type="complete",
+                data=EventData(run_id=uuid4())
             )
 
     def send_feedback(self, access_token: str, message_pair_id: UUID, rating: int, comments: str) -> bool:
