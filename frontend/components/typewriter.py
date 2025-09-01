@@ -1,6 +1,5 @@
 import streamlit as st
 
-
 _typewriter_style = """
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro" rel="stylesheet"/>
     <style>

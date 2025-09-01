@@ -1,8 +1,9 @@
-from .datatypes import MessagePair, Step, Thread, UserMessage
+from .datatypes import EventData, MessagePair, StreamEvent, Thread, UserMessage
 
 __all__ = [
+    "EventData",
     "MessagePair",
-    "Step",
+    "StreamEvent",
     "Thread",
     "UserMessage",
 ]

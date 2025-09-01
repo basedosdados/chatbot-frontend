@@ -10,7 +10,7 @@ from frontend.components.chat_page import ChatPage
 from frontend.utils.constants import (BASE_URL, LOG_BACKTRACE, LOG_DIAGNOSE,
                                       LOG_ENQUEUE, LOG_FILE_PATH, LOG_LEVEL,
                                       LOG_RETENTION, LOG_ROTATION, NEW_CHAT)
-from frontend.utils.icons import AVATARS
+from frontend.utils.logos import BD_LOGO
 
 
 @cache
@@ -51,7 +51,7 @@ _setup_logger()
 
 st.set_page_config(
     page_title="Chatbot BD",
-    page_icon=AVATARS["assistant"]
+    page_icon=BD_LOGO
 )
 
 api = APIClient(BASE_URL)
@@ -84,6 +84,7 @@ def login():
             st.session_state["chat_pages"] = []
 
         st.session_state["email"] = email
+        st.session_state["user_avatar"] = f"https://api.dicebear.com/9.x/initials/svg?seed={email[0]}&backgroundColor=7ec876&radius=50"
         st.session_state["logged_in"] = True
         st.session_state["access_token"] = access_token
         st.success(message, icon=":material/check:")
