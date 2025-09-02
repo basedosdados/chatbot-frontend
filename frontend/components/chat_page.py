@@ -2,6 +2,7 @@ import json
 import uuid
 from typing import Any
 
+import sqlparse
 import streamlit as st
 from loguru import logger
 
@@ -453,7 +454,13 @@ def _format_tool_args(args: dict[str, Any]) -> str:
     if not sql_query:
         return json.dumps(args, indent=2, ensure_ascii=False)
 
-    sql_block = f'  "sql_query": `\n{sql_query.strip()}\n`'
+    sql_query = sqlparse.format(
+        sql_query.strip(),
+        reindent=True,
+        keyword_case="upper"
+    )
+
+    sql_block = f'  "sql_query": `\n{sql_query}\n`'
 
     return "{\n" + sql_block + "\n}"
 

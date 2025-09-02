@@ -2077,6 +2077,22 @@ files = [
 ]
 
 [[package]]
+name = "sqlparse"
+version = "0.5.3"
+description = "A non-validating SQL parser."
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "sqlparse-0.5.3-py3-none-any.whl", hash = "sha256:cf2196ed3418f3ba5de6af7e82c694a9fbdbfecccdfc72e281548517081f16ca"},
+    {file = "sqlparse-0.5.3.tar.gz", hash = "sha256:09f67787f56a0b16ecdbde1bfc7f5d9c3371ca683cfeaa8e6ff60b4807ec9272"},
+]
+
+[package.extras]
+dev = ["build", "hatch"]
+doc = ["sphinx"]
+
+[[package]]
 name = "st-annotated-text"
 version = "4.0.2"
 description = "A simple component to display annotated text in Streamlit apps."
@@ -2507,4 +2523,4 @@ dev = ["black (>=19.3b0) ; python_version >= \"3.6\"", "pytest (>=4.6.2)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "9b5a4bd9b4f0896e5819882756cebdc1c5e6031f3e40e9d052e7826d2d893baf"
+content-hash = "88a24df35196be453d0ab647df8b611ca5ea047e76698c0f6d069b33be680bc7"
