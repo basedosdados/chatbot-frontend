@@ -358,7 +358,7 @@ class ChatPage:
                         else:
                             _display_tool_event(event)
 
-                if message_pair.assistant_message:
+                if message_pair.assistant_message is not None:
                     st.write_stream(message_pair.stream_words)
                 else:
                     st.error(message_pair.error_message)
