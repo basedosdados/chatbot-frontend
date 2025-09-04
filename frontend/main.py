@@ -123,9 +123,8 @@ def about():
     # Available features
     st.subheader("Funcionalidades :memo:")
     st.write("""
-        - **Exibir Código (:blue[:material/code:]):** Clique no botão de exibição de código para exibir ou ocultar as consultas SQL geradas pelo chatbot.
-        - **Feedback (:blue[:material/thumb_up:] ou :blue[:material/thumb_down:]):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais. É necessário clicar no botão de envio (:material/send:) para que o feedback seja enviado.
-        - **Excluir Conversa (:blue[:material/delete:]):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. Essa ação é irreversível."""
+        - **Feedback (:material/thumb_up: ou :material/thumb_down:):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais. É necessário clicar no botão de envio (:material/send:) para que o feedback seja enviado.
+        - **Excluir Conversa (:material/delete:):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. Essa ação é irreversível."""
     )
     st.write("\n")
 
