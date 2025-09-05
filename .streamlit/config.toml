@@ -3,6 +3,7 @@ gatherUsageStats=false
 
 [client]
 showErrorDetails="type"
+toolbarMode = "minimal"
 
 [theme]
 base="light"
