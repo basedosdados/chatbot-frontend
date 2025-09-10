@@ -502,5 +502,7 @@ def _display_tool_event(event: StreamEvent):
             if tool_output.status == "error":
                 st.markdown(f"Erro na execução da ferramenta `{tool_output.tool_name}`")
             else:
+                if tool_output.metadata and tool_output.metadata.get("truncated"):
+                    st.info("Resposta muito extensa. Exibindo resultados parciais.", icon=":material/info:")
                 tool_outputs = _format_tool_outputs(tool_output.output)
                 _display_code_block(f"Resposta:\n{tool_outputs}")

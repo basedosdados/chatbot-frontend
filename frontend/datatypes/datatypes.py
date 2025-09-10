@@ -27,6 +27,7 @@ class ToolOutput(BaseModel):
     tool_call_id: str
     tool_name: str
     output: str
+    metadata: dict[str, Any] | None = None
 
 EventType = Literal[
     "tool_call",
