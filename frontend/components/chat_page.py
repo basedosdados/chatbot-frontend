@@ -50,65 +50,79 @@ class ChatPage:
             _show_error_popup("Não foi possível criar a thread. Por favor, inicie uma nova conversa.")
             return False
 
-    def _handle_click_feedback(self, feedback_id: str, show_comments_id: str):
-        """Update the feedback buttons state and the comments text input flag on session state.
-
-        Args:
-            feedback_id (str): The feedback button identifier.
-            show_comments_id (str): The comments text input flag identifier.
-        """
-        feedback = st.session_state[feedback_id]
-
-        page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
-
-        # The _handle_click_feedback method is being called sometimes when changing
-        # pages and then coming back, so some guard clauses had to be used
-        # to avoid empty or duplicated feedbacks sending
-
-        # First, we must check if the feedback is None
-        if feedback is None:
-            return
-
-        # Then, we must check if the feedback is the same as the last sent feedback
-        if feedback_id in page_feedbacks and page_feedbacks[feedback_id] == feedback:
-            return
-
-        # Finally, we update it on the session state
-        page_feedbacks[feedback_id] = feedback
-
-        # And show the comments text input
-        st.session_state[show_comments_id] = True
-
-    def _handle_send_feedback(
-        self,
-        feedback_id: str,
-        message_pair_id: uuid.UUID,
-        show_comments_id: str,
-        comments: str | None
-    ):
+    def _handle_send_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
         """Handle feedback sending.
 
         Args:
-            feedback_id (str): The feedback id.
-            message_pair_id (UUID): The message pair id.
-            show_comments_id (str): The show_comments flag id.
-            comments (str | None): The comments.
+            feedback_id (str): The feedback button identifier.
+            message_pair_id (uuid.UUID): The message pair identifier.
         """
-        rating = st.session_state[feedback_id]
-        access_token = st.session_state["access_token"]
+        def reset_feedback_state():
+            page_feedbacks: dict = st.session_state[self.page_id][self.feedbacks_key]
+            st.session_state[feedback_id] = page_feedbacks.get(feedback_id)
+            st.session_state[self.page_id]["feedback_clicked"] = False
 
-        if not self.api.send_feedback(
-            access_token=access_token,
-            message_pair_id=message_pair_id,
-            rating=rating,
-            comments=comments
-        ):
-            _show_error_popup("Não foi possível enviar o feedback.")
+        @st.dialog("Feedback", on_dismiss=reset_feedback_state)
+        def show_feedback_popup():
+            feedback = st.session_state[feedback_id]
+            access_token = st.session_state["access_token"]
 
-        st.session_state[show_comments_id] = False
+            if feedback:
+                placeholder = "O que foi satisfatório na resposta?"
+            else:
+                placeholder = "O que foi insatisfatório na resposta?"
+
+            comments = st.text_area(
+                label=":gray[Comentários adicionais (opcional)]",
+                placeholder=placeholder,
+                value=None,
+            )
+
+            col1, col2, _ = st.columns([0.18, 0.22, 0.63])
+
+            if col1.button("Enviar", type="primary"):
+                if self.api.send_feedback(
+                    access_token=access_token,
+                    message_pair_id=message_pair_id,
+                    rating=feedback,
+                    comments=comments
+                ):
+                    page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
+                    page_feedbacks[feedback_id] = feedback
+                    st.session_state[self.page_id]["feedback_clicked"] = False
+                    st.rerun()
+                else:
+                    st.error("Não foi possível enviar o feedback.", icon=":material/error:")
+
+            if col2.button("Cancelar"):
+                reset_feedback_state()
+                st.rerun()
+
+        show_feedback_popup()
+
+    def _handle_click_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
+        """Handle feedback buttons click and open the feedback dialog.
+
+        Args:
+            feedback_id (str): The feedback button identifier.
+            message_pair_id (uuid.UUID): The message pair identifier.
+        """
+        feedback = st.session_state[feedback_id]
+
+        page_feedbacks: dict = st.session_state[self.page_id][self.feedbacks_key]
+
+        # If feedback is None *after* a button click, it means Streamlit
+        # is resetting the button state, which we don’t want. In this case,
+        # restore it to its previous value.
+        if feedback is None:
+            st.session_state[feedback_id] = page_feedbacks.get(feedback_id)
+
+        # Finally, set the feedback clicked flag and open the feedback dialog
+        st.session_state[self.page_id]["feedback_clicked"] = True
+        self._handle_send_feedback(feedback_id, message_pair_id)
 
     def _render_message_buttons(self, message_pair: MessagePair):
-        """Render the code-showing button and all the feedback related widgets on assistant's messages.
+        """Render the feedback buttons on assistant's messages.
 
         Args:
             message_pair (MessagePair):
@@ -119,75 +133,33 @@ class ChatPage:
                     - error_message: error message.
                     - events: list of streamed events.
         """
-        # Container for feedback widgets
-        feedback_container = st.container()
-
-        # Creates three columns:
-        # the first one is for the feedback buttons
-        # the second one is for the comments input
-        # the thrid one is for the feedback sending button
-        col1, col2, col3 = feedback_container.columns(
-            (0.12, 1.05, 0.105),
-            vertical_alignment="center"
-        )
-
-        # Checks if the model is still answering the last question.
-        # If yes, all message buttons and comments inputs will be disabled
+        # Checks if the model is still answering the question.
+        # If so, all message buttons are disabled
         waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
 
-        # Unique identifiers for the feedback buttons widget
-        # and for a flag that determines if the comments input should be shown
+        # Unique identifier for the feedback buttons widget
         feedback_id = f"feedback_{message_pair.id}"
-        comments_input_id = f"comments_input_{message_pair.id}"
-        show_comments_id = f"show_comments_{message_pair.id}"
-        send_comments_id = f"send_comments_{message_pair.id}"
-
-        # By default, the comments input should be hidden
-        if show_comments_id not in st.session_state:
-            st.session_state[show_comments_id] = False
 
         # Look for the feedback buttons widget in the session state
         page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
 
-        # And keep its state if it already existed in the session
-        if feedback_id in page_feedbacks:
+        # Restore previous feedback state if it already exists in the session
+        # and no feedback was clicked in this run, to persist state across reruns
+        if (
+            feedback_id in page_feedbacks and
+            not st.session_state[self.page_id]["feedback_clicked"]
+        ):
             last_feedback = page_feedbacks[feedback_id]
             st.session_state[feedback_id] = last_feedback
 
-        # Renders the feedback buttons
-        col1.feedback(
+        # Render the feedback buttons
+        st.feedback(
             "thumbs",
             key=feedback_id,
             on_change=self._handle_click_feedback,
-            args=(feedback_id, show_comments_id),
+            args=(feedback_id, message_pair.id),
             disabled=waiting_for_answer
         )
-
-        # If the flag is set, shows the comments input and the sending button
-        if st.session_state[show_comments_id]:
-            comments = col2.text_input(
-                "comments",
-                key=comments_input_id,
-                value=None,
-                placeholder="Comentários (opcional)",
-                label_visibility="collapsed",
-                disabled=waiting_for_answer
-            )
-
-            # If the sending button is pressed, sends the feedback and comments
-            # to the backend and hides the comments input and the sending button
-            col3.button(
-                ":material/send:",
-                key=send_comments_id,
-                on_click=self._handle_send_feedback,
-                args=(
-                    feedback_id,
-                    message_pair.id,
-                    show_comments_id,
-                    comments
-                ),
-                disabled=waiting_for_answer
-            )
 
     def _render_delete_button(self):
         """Render the chat deletion button."""
@@ -212,6 +184,7 @@ class ChatPage:
                     return
 
                 chat_pages: list[ChatPage] = st.session_state["chat_pages"]
+
                 for i, chat_page in enumerate(chat_pages):
                     if chat_page.thread_id == self.thread_id:
                         chat_pages.pop(i)
@@ -252,6 +225,10 @@ class ChatPage:
         # Initialize feedback history
         if self.feedbacks_key not in page_session_state:
             page_session_state[self.feedbacks_key] = {}
+
+        # Initialize flag to check if the feedback button is clicked
+        if "feedback_clicked" not in page_session_state:
+            page_session_state["feedback_clicked"] = False
 
         # Initialize the waiting key, which is used to prevent users from
         # interacting with the app while the model is answering a question
