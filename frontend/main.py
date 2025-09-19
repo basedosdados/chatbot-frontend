@@ -123,7 +123,7 @@ def about():
     # Available features
     st.subheader("Funcionalidades :memo:")
     st.write("""
-        - **Feedback (:material/thumb_up: ou :material/thumb_down:):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais. É necessário clicar no botão de envio (:material/send:) para que o feedback seja enviado.
+        - **Feedback (:material/thumb_up: ou :material/thumb_down:):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais.
         - **Excluir Conversa (:material/delete:):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. Essa ação é irreversível."""
     )
     st.write("\n")
@@ -140,8 +140,8 @@ def about():
     st.write("\n")
 
     # Important information
-    st.subheader(":gray[:material/info:] Importante")
-    st.info("Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.")
+    st.subheader("Importante :pushpin:")
+    st.info("Depois de enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.")
 
 if st.session_state.get("logged_in"):
     about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
