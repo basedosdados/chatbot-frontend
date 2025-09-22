@@ -5,6 +5,7 @@ from typing import Any
 import sqlparse
 import streamlit as st
 from loguru import logger
+from streamlit_extras.stylable_container import stylable_container
 
 from frontend.api import APIClient
 from frontend.components import *
@@ -78,25 +79,33 @@ class ChatPage:
                 value=None,
             )
 
-            col1, col2, _ = st.columns([0.18, 0.22, 0.63])
+            with stylable_container(
+                key="feedback_dialog_buttons",
+                css_styles="""
+                    button {
+                        white-space: nowrap;
+                    }
+                """
+            ):
+                _, col1, col2 = st.columns([0.64, 0.18, 0.22])
 
-            if col1.button("Enviar", type="primary"):
-                if self.api.send_feedback(
-                    access_token=access_token,
-                    message_pair_id=message_pair_id,
-                    rating=feedback,
-                    comments=comments
-                ):
-                    page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
-                    page_feedbacks[feedback_id] = feedback
-                    st.session_state[self.page_id]["feedback_clicked"] = False
+                if col1.button("Enviar", type="primary"):
+                    if self.api.send_feedback(
+                        access_token=access_token,
+                        message_pair_id=message_pair_id,
+                        rating=feedback,
+                        comments=comments
+                    ):
+                        page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
+                        page_feedbacks[feedback_id] = feedback
+                        st.session_state[self.page_id]["feedback_clicked"] = False
+                        st.rerun()
+                    else:
+                        st.error("Não foi possível enviar o feedback.", icon=":material/error:")
+
+                if col2.button("Cancelar"):
+                    reset_feedback_state()
                     st.rerun()
-                else:
-                    st.error("Não foi possível enviar o feedback.", icon=":material/error:")
-
-            if col2.button("Cancelar"):
-                reset_feedback_state()
-                st.rerun()
 
         show_feedback_popup()
 
