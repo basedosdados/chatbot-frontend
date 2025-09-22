@@ -4,7 +4,7 @@ from streamlit_extras.bottom_container import bottom
 
 def render_disclaimer():
     with bottom():
-        _, center, _ = st.columns((1, 6, 1))
+        _, center, _ = st.columns([1, 6, 1])
 
         center.markdown(
             """
