@@ -206,9 +206,7 @@ class APIClient:
         Returns:
             bool: Whether the operation succeeded or not.
         """
-        feedback_meaning = "positive" if rating else "negative"
-
-        self.logger.info(f"[FEEDBACK] Sending {feedback_meaning} feedback for message pair {message_pair_id}")
+        self.logger.info(f"[FEEDBACK] Sending feedback ({rating}) for message pair {message_pair_id}")
 
         try:
             response = httpx.put(
