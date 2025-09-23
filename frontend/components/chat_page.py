@@ -18,6 +18,7 @@ class ChatPage:
     chat_history_key = "chat_history"
     delete_btn_key = "delete_btn"
     feedbacks_key = "feedbacks"
+    feedback_clicked_key = "feedback_clicked"
     waiting_key = "waiting_for_answer"
 
     def __init__(self, api: APIClient, title: str | None = None, thread_id: str | None = None):
@@ -61,7 +62,7 @@ class ChatPage:
         def reset_feedback_state():
             page_feedbacks: dict = st.session_state[self.page_id][self.feedbacks_key]
             st.session_state[feedback_id] = page_feedbacks.get(feedback_id)
-            st.session_state[self.page_id]["feedback_clicked"] = False
+            st.session_state[self.page_id][self.feedback_clicked_key] = False
 
         @st.dialog("Feedback", on_dismiss=reset_feedback_state)
         def show_feedback_popup():
@@ -98,7 +99,7 @@ class ChatPage:
                     ):
                         page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
                         page_feedbacks[feedback_id] = feedback
-                        st.session_state[self.page_id]["feedback_clicked"] = False
+                        st.session_state[self.page_id][self.feedback_clicked_key] = False
                         st.rerun()
                     else:
                         st.error("Não foi possível enviar o feedback.", icon=":material/error:")
@@ -127,7 +128,7 @@ class ChatPage:
             st.session_state[feedback_id] = page_feedbacks.get(feedback_id)
 
         # Finally, set the feedback clicked flag and open the feedback dialog
-        st.session_state[self.page_id]["feedback_clicked"] = True
+        st.session_state[self.page_id][self.feedback_clicked_key] = True
         self._handle_send_feedback(feedback_id, message_pair_id)
 
     def _render_message_buttons(self, message_pair: MessagePair):
@@ -156,7 +157,7 @@ class ChatPage:
         # and no feedback was clicked in this run, to persist state across reruns
         if (
             feedback_id in page_feedbacks and
-            not st.session_state[self.page_id]["feedback_clicked"]
+            not st.session_state[self.page_id][self.feedback_clicked_key]
         ):
             last_feedback = page_feedbacks[feedback_id]
             st.session_state[feedback_id] = last_feedback
@@ -236,8 +237,8 @@ class ChatPage:
             page_session_state[self.feedbacks_key] = {}
 
         # Initialize flag to check if the feedback button is clicked
-        if "feedback_clicked" not in page_session_state:
-            page_session_state["feedback_clicked"] = False
+        if self.feedback_clicked_key not in page_session_state:
+            page_session_state[self.feedback_clicked_key] = False
 
         # Initialize the waiting key, which is used to prevent users from
         # interacting with the app while the model is answering a question
