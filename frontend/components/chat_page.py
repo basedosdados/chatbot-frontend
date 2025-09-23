@@ -80,6 +80,8 @@ class ChatPage:
                 value=None,
             )
 
+            error_placeholder = st.empty()
+
             with stylable_container(
                 key="feedback_dialog_buttons",
                 css_styles="""
@@ -102,7 +104,7 @@ class ChatPage:
                         st.session_state[self.page_id][self.feedback_clicked_key] = False
                         st.rerun()
                     else:
-                        st.error("Não foi possível enviar o feedback.", icon=":material/error:")
+                        error_placeholder.error("Não foi possível enviar o feedback.", icon=":material/error:")
 
                 if col2.button("Cancelar"):
                     reset_feedback_state()
