@@ -74,7 +74,7 @@ class MessagePair(BaseModel):
             try:
                 return escape_currency(self.assistant_message)
             except Exception:
-                logger.exception(f"Failed to escape currency in message pair {self.id}:")
+                logger.exception(f"Failed to escape currency symbols for message pair {self.id}:")
         return self.assistant_message
 
     def stream_characters(self) -> Generator[str]:
