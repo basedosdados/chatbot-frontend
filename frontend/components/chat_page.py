@@ -289,7 +289,7 @@ class ChatPage:
                         _display_tool_event(event)
 
                 if message_pair.assistant_message is not None:
-                    st.write(message_pair.assistant_message)
+                    st.write(message_pair.formatted_assistant_message)
                 else:
                     st.error(message_pair.error_message)
 

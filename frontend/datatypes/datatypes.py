@@ -4,7 +4,10 @@ from collections.abc import Generator
 from datetime import datetime
 from typing import Any, Literal, Optional
 
+from loguru import logger
 from pydantic import UUID4, BaseModel, Field, model_validator
+
+from frontend.utils import escape_currency
 
 
 class Thread(BaseModel):
@@ -64,24 +67,34 @@ class MessagePair(BaseModel):
             "or 'error_message' fields must be provided"
         )
 
+    @property
+    def formatted_assistant_message(self) -> str | None:
+        """Assistant message with currency symbols escaped for markdown rendering."""
+        if self.assistant_message:
+            try:
+                return escape_currency(self.assistant_message)
+            except Exception:
+                logger.exception(f"Failed to escape currency in message pair {self.id}:")
+        return self.assistant_message
+
     def stream_characters(self) -> Generator[str]:
-        """Streams the assistant message character by character
+        """Streams the assistant message character by character.
 
         Yields:
-            Generator[str]
+            Generator[str].
         """
         if self.assistant_message:
-            for character in self.assistant_message:
+            for character in self.formatted_assistant_message:
                 yield character
                 time.sleep(0.01)
 
     def stream_words(self) -> Generator[str]:
-        """Streams the assistant message word by word
+        """Streams the assistant message word by word.
 
         Yields:
-            Generator[str]
+            Generator[str].
         """
         if self.assistant_message:
-            for word in filter(None, self.assistant_message.split(" ")):
+            for word in filter(None, self.formatted_assistant_message.split(" ")):
                 yield word + " "
                 time.sleep(0.02)
