@@ -5,6 +5,7 @@ from typing import Any
 import sqlparse
 import streamlit as st
 from loguru import logger
+from streamlit.delta_generator import DeltaGenerator
 from streamlit_extras.stylable_container import stylable_container
 
 from frontend.api import APIClient
@@ -279,14 +280,15 @@ class ChatPage:
             with st.chat_message("assistant", avatar=BD_LOGO):
                 st.empty()
 
-                if message_pair.assistant_message is not None:
-                    label, state = "Concluído!", "complete"
-                else:
-                    label, state = "Erro", "error"
+                if _has_tool_events(message_pair.events):
+                    if message_pair.assistant_message is not None:
+                        label, state = "Concluído! Clique para ver os detalhes", "complete"
+                    else:
+                        label, state = "Erro", "error"
 
-                with st.status(label=label, state=state) as status:
-                    for event in message_pair.events:
-                        _display_tool_event(event)
+                    with st.status(label=label, state=state):
+                        for event in message_pair.events:
+                            _display_tool_event(event)
 
                 if message_pair.assistant_message is not None:
                     st.write(message_pair.formatted_assistant_message)
@@ -319,33 +321,40 @@ class ChatPage:
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=BD_LOGO):
                 events = []
-                assistant_message = None
                 error_message = None
+                assistant_message = None
+                status_placeholder = st.empty()
 
-                with st.status("Consultando a Base dos Dados...") as status:
-                    for event in self.api.send_message(
-                        access_token=st.session_state["access_token"],
-                        message=user_prompt,
-                        thread_id=self.thread_id
-                    ):
-                        events.append(event)
-                        if event.type == "final_answer":
-                            assistant_message = event.data.content
-                            label, state = "Concluído!", "complete"
-                        elif event.type == "error":
-                            error_message = event.data.error_details.get("message", "Erro")
-                            label, state = "Erro", "error"
-                        elif event.type == "complete":
-                            message_pair = MessagePair(
-                                id=event.data.run_id,
-                                user_message=user_prompt,
-                                assistant_message=assistant_message,
-                                error_message=error_message,
-                                events=events
-                            )
+                status = status_placeholder.status("Pensando...")
+
+                for event in self.api.send_message(
+                    access_token=st.session_state["access_token"],
+                    message=user_prompt,
+                    thread_id=self.thread_id
+                ):
+                    events.append(event)
+
+                    if event.type == "final_answer":
+                        assistant_message = event.data.content
+                        label, state = "Concluído! Clique para ver os detalhes", "complete"
+                    elif event.type == "error":
+                        error_message = event.data.error_details.get("message", "Erro")
+                        label, state = "Erro", "error"
+                    elif event.type == "complete":
+                        message_pair = MessagePair(
+                            id=event.data.run_id,
+                            user_message=user_prompt,
+                            assistant_message=assistant_message,
+                            error_message=error_message,
+                            events=events
+                        )
+                        if _has_tool_events(message_pair.events):
                             status.update(label=label, state=state)
                         else:
-                            _display_tool_event(event)
+                            status_placeholder.empty()
+                    else:
+                        status.update(label="Consultando a Base dos Dados...")
+                        _display_tool_event(event, container=status)
 
                 if message_pair.assistant_message is not None:
                     st.write_stream(message_pair.stream_words)
@@ -402,7 +411,24 @@ def _clear_new_chat_page():
     st.session_state[NEW_CHAT] = None
 
 
-def _display_code_block(code_block: str, max_lines: int=10, max_height: int=256):
+def _has_tool_events(events: list[StreamEvent]) -> bool:
+    """Check if there are any tool-related events in the event list.
+
+    Args:
+        events (list[StreamEvent]): List of stream events.
+
+    Returns:
+        bool: True if there are tool_call or tool_output events, False otherwise.
+    """
+    return any(event.type in ("tool_call", "tool_output") for event in events)
+
+
+def _display_code_block(
+    code_block: str,
+    max_lines: int=10,
+    max_height: int=256,
+    container: DeltaGenerator | None = None
+):
     """Display a code block in Streamlit with adaptive height.
 
     If the code block has more lines than `max_lines`, the display height
@@ -415,7 +441,11 @@ def _display_code_block(code_block: str, max_lines: int=10, max_height: int=256)
             before capping the height. Defaults to 10.
         max_height (int, optional): Maximum height in pixels for code blocks
             exceeding `max_lines`. Defaults to 256.
+        container (DeltaGenerator | None, optional): Streamlit container
+            to render into. If None, uses st directly. Defaults to None.
     """
+    ctx = container if container is not None else st
+
     n_lines = code_block.count("\n") + 1
 
     if n_lines > max_lines:
@@ -423,7 +453,7 @@ def _display_code_block(code_block: str, max_lines: int=10, max_height: int=256)
     else:
         height = "content"
 
-    st.code(code_block, height=height)
+    ctx.code(code_block, height=height)
 
 
 def _format_tool_args(args: dict[str, Any]) -> str:
@@ -470,7 +500,7 @@ def _format_tool_outputs(results: str) -> str:
     )
 
 
-def _display_tool_event(event: StreamEvent):
+def _display_tool_event(event: StreamEvent, container: DeltaGenerator | None = None):
     """Render a tool-related event in the Streamlit UI.
 
     Displays messages, tool call arguments, and tool outputs
@@ -478,20 +508,24 @@ def _display_tool_event(event: StreamEvent):
 
     Args:
         event (StreamEvent): The tool event to display.
+        container (DeltaGenerator | None, optional): Streamlit container
+            to render into. If None, uses st directly. Defaults to None.
     """
+    ctx = container if container is not None else st
+
     if event.type == "tool_call":
         if event.data.content:
-            st.markdown(event.data.content)
+            ctx.markdown(event.data.content)
         for tool_call in event.data.tool_calls:
-            st.markdown(f"**Executando ferramenta** `{tool_call.name}`")
+            ctx.markdown(f"**Executando ferramenta** `{tool_call.name}`")
             tool_args = _format_tool_args(tool_call.args)
-            _display_code_block(f"Solicitação:\n{tool_args}")
+            _display_code_block(f"Solicitação:\n{tool_args}", container=ctx)
     elif event.type == "tool_output":
         for tool_output in event.data.tool_outputs:
             if tool_output.status == "error":
-                st.markdown(f"Erro na execução da ferramenta `{tool_output.tool_name}`")
+                ctx.markdown(f"Erro na execução da ferramenta `{tool_output.tool_name}`")
             else:
                 if tool_output.metadata and tool_output.metadata.get("truncated"):
-                    st.info("Resposta muito extensa. Exibindo resultados parciais.", icon=":material/info:")
+                    ctx.info("Resposta muito extensa. Exibindo resultados parciais.", icon=":material/info:")
                 tool_outputs = _format_tool_outputs(tool_output.output)
-                _display_code_block(f"Resposta:\n{tool_outputs}")
+                _display_code_block(f"Resposta:\n{tool_outputs}", container=ctx)
