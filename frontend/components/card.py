@@ -1,6 +1,5 @@
 import streamlit.components.v1 as components
 
-
 _card_style = """
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined&family=Source+Sans+Pro" rel="stylesheet"/>
     <style>

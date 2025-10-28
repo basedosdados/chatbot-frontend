@@ -1,6 +1,5 @@
 import streamlit as st
 
-
 _typewriter_style = """
     <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro" rel="stylesheet"/>
     <style>
@@ -12,11 +11,11 @@ _typewriter_style = """
 
         @keyframes blink-caret {
             from, to { border-color: transparent; }
-            50% { border-color: white; }
+            50% { border-color: #31333f; }
         }
 
         @keyframes disappear {
-            0% { border-color: white; }
+            0% { border-color: #31333f; }
             100% { border-color: transparent; }
         }
 
@@ -28,7 +27,7 @@ _typewriter_style = """
             overflow: hidden; /* Ensures the content is not revealed until the animation */
             padding-right: 0.1em; /* Adds space between the text and the cursor */
             margin: 0 auto; /* Centering effect */
-            border-right: 0.125em solid white; /* The typewriter cursor */
+            border-right: 0.125em solid #31333f; /* The typewriter cursor */
             animation:
                 typing 1s steps(80, end),
                 blink-caret 0.75s step-end infinite,

@@ -62,10 +62,10 @@ jobs:
             replicas: 1
             resources:
               requests:
-                cpu: 1
+                cpu: 250m
                 memory: 500Mi
               limits:
-                cpu: 1
+                cpu: 500m
                 memory: 1Gi
             ingress:
               enabled: true

@@ -1,11 +1,11 @@
-import json
 from typing import Iterator
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 from loguru import logger
 
-from frontend.datatypes import MessagePair, Step, Thread, UserMessage
+from frontend.datatypes import (EventData, MessagePair, StreamEvent, Thread,
+                                UserMessage)
 
 
 class APIClient:
@@ -121,7 +121,7 @@ class APIClient:
             self.logger.exception(f"[MESSAGE] Error on message pairs retrieval for thread {thread_id}:")
             return None
 
-    def send_message(self, access_token: str, message: str, thread_id: UUID) -> Iterator[tuple[str, Step|MessagePair]]:
+    def send_message(self, access_token: str, message: str, thread_id: UUID) -> Iterator[StreamEvent]:
         """Send a user message and stream the assistant's response.
 
         Args:
@@ -130,14 +130,12 @@ class APIClient:
             thread_id (UUID): The unique identifier of the thread.
 
         Yields:
-            Iterator[tuple[str, Step|MessagePair]]: Tuples containing a status message and either a `Step` or `MessagePair` object.
-                While streaming, `Step` objects are yielded. Once streaming is complete, a final `MessagePair` is yielded.
+            Iterator[StreamEvent]: Iterator of `StreamEvent` objects.
         """
         user_message = UserMessage(content=message)
 
         self.logger.info(f"[MESSAGE] Sending message {user_message.id} in thread {thread_id}")
 
-        steps = []
         error_message = None
         stream_completed = False
 
@@ -157,19 +155,12 @@ class APIClient:
                     if not line:
                         continue
 
-                    payload = json.loads(line)
-                    streaming_status = payload["status"]
-                    data = payload["data"]
+                    event = StreamEvent.model_validate_json(line)
 
-                    if streaming_status == "running":
-                        message = Step.model_validate_json(data)
-                        steps.append(message)
-                    elif streaming_status == "complete":
-                        data["steps"] = steps
-                        message = MessagePair(**data)
+                    if event.type == "complete":
                         stream_completed = True
 
-                    yield streaming_status, message
+                    yield event
         except httpx.ReadTimeout:
             self.logger.exception(f"[MESSAGE] Timeout error on sending user message:")
             error_message=(
@@ -184,7 +175,7 @@ class APIClient:
             )
 
         # Safeguard for unexpected stream termination. Handles cases where the server
-        # crashes ands the httpx.stream() call ends silently without raising an exception.
+        # crashes and the httpx.stream() call ends silently without raising an exception.
         if not stream_completed:
             if not error_message:
                 self.logger.error("[MESSAGE] Stream terminated without a 'complete' status")
@@ -192,12 +183,16 @@ class APIClient:
                     "Ops, a conexão com o servidor foi interrompida inesperadamente! "
                     "Por favor, tente novamente mais tarde. Se o problema persistir, avise-nos."
                 )
-            message = MessagePair(
-                user_message=user_message.content,
-                error_message=error_message,
-                steps=steps or [],
+
+            yield StreamEvent(
+                type="error",
+                data=EventData(error_details={"message": error_message})
             )
-            yield "complete", message
+
+            yield StreamEvent(
+                type="complete",
+                data=EventData(run_id=uuid4())
+            )
 
     def send_feedback(self, access_token: str, message_pair_id: UUID, rating: int, comments: str) -> bool:
         """Send a feedback.
@@ -211,17 +206,12 @@ class APIClient:
         Returns:
             bool: Whether the operation succeeded or not.
         """
-        feedback_meaning = "positive" if rating else "negative"
-
-        self.logger.info(f"[FEEDBACK] Sending {feedback_meaning} feedback for message pair {message_pair_id}")
+        self.logger.info(f"[FEEDBACK] Sending feedback ({rating}) for message pair {message_pair_id}")
 
         try:
             response = httpx.put(
                 url=f"{self.base_url}/chatbot/message-pairs/{message_pair_id}/feedbacks/",
-                json={
-                    "rating": rating,
-                    "comment": comments,
-                },
+                json={"rating": rating, "comment": comments},
                 headers={"Authorization": f"Bearer {access_token}"}
             )
             response.raise_for_status()
@@ -246,7 +236,8 @@ class APIClient:
         try:
             response = httpx.delete(
                 url=f"{self.base_url}/chatbot/threads/{thread_id}/",
-                headers={"Authorization": f"Bearer {access_token}"}
+                headers={"Authorization": f"Bearer {access_token}"},
+                timeout=httpx.Timeout(5.0, read=60.0)
             )
             response.raise_for_status()
             self.logger.success(f"[CLEAR] Assistant memory cleared successfully")

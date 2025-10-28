@@ -3,6 +3,10 @@ gatherUsageStats=false
 
 [client]
 showErrorDetails="type"
+toolbarMode = "minimal"
 
 [theme]
-base="dark"
+base="light"
+primaryColor="#2b8c4d"
+backgroundColor="#ffffff"
+secondaryBackgroundColor="#eeeeee"

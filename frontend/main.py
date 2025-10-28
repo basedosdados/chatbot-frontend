@@ -10,7 +10,7 @@ from frontend.components.chat_page import ChatPage
 from frontend.utils.constants import (BASE_URL, LOG_BACKTRACE, LOG_DIAGNOSE,
                                       LOG_ENQUEUE, LOG_FILE_PATH, LOG_LEVEL,
                                       LOG_RETENTION, LOG_ROTATION, NEW_CHAT)
-from frontend.utils.icons import AVATARS
+from frontend.utils.logos import BD_LOGO
 
 
 @cache
@@ -51,7 +51,7 @@ _setup_logger()
 
 st.set_page_config(
     page_title="Chatbot BD",
-    page_icon=AVATARS["assistant"]
+    page_icon=BD_LOGO
 )
 
 api = APIClient(BASE_URL)
@@ -84,6 +84,7 @@ def login():
             st.session_state["chat_pages"] = []
 
         st.session_state["email"] = email
+        st.session_state["user_avatar"] = f"https://api.dicebear.com/9.x/initials/svg?seed={email[0]}&backgroundColor=7ec876&radius=50"
         st.session_state["logged_in"] = True
         st.session_state["access_token"] = access_token
         st.success(message, icon=":material/check:")
@@ -122,9 +123,8 @@ def about():
     # Available features
     st.subheader("Funcionalidades :memo:")
     st.write("""
-        - **Exibir Código (:blue[:material/code:]):** Clique no botão de exibição de código para exibir ou ocultar as consultas SQL geradas pelo chatbot.
-        - **Feedback (:blue[:material/thumb_up:] ou :blue[:material/thumb_down:]):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais. É necessário clicar no botão de envio (:material/send:) para que o feedback seja enviado.
-        - **Excluir Conversa (:blue[:material/delete:]):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. Essa ação é irreversível."""
+        - **Feedback (:material/thumb_up: ou :material/thumb_down:):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais.
+        - **Excluir Conversa (:material/delete:):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. Essa ação é irreversível."""
     )
     st.write("\n")
 
@@ -140,8 +140,8 @@ def about():
     st.write("\n")
 
     # Important information
-    st.subheader(":gray[:material/info:] Importante")
-    st.info("Quando enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.")
+    st.subheader("Importante :pushpin:")
+    st.info("Depois de enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.")
 
 if st.session_state.get("logged_in"):
     about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
