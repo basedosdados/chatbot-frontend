@@ -8,7 +8,7 @@ def escape_currency(text: str):
         text (str): Input text.
 
     Returns:
-        str: Text with currency dollar signs escaped as \$.
+        str: Text with currency dollar signs escaped.
     """
     # Regex to match math blocks ($$...$$), inline math ($...$), or single dollars ($)
     # Inline math must not contain white spaces at the beginning/end of the expression
