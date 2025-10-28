@@ -3,6 +3,7 @@ name: Release Development Docker Image
 on:
   push:
     branches: dev
+  workflow_dispatch:
 
 jobs:
   release-dev:
