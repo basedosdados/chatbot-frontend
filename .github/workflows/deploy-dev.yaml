@@ -59,6 +59,13 @@ jobs:
               name: ghcr.io/${{ github.repository }}
               tag: dev
               pullPolicy: Always
+            env:
+              API_HOST: api-development-service
+              API_PORT: 80
+              LOG_LEVEL: INFO
+              LOG_BACKTRACE: true
+              LOG_DIAGNOSE: false
+              LOG_ENQUEUE: true
             replicas: 1
             resources:
               requests:
