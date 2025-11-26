@@ -1,6 +1,6 @@
+import sys
 import time
 from functools import cache
-from pathlib import Path
 
 import streamlit as st
 from loguru import logger
@@ -8,17 +8,12 @@ from loguru import logger
 from frontend.api import APIClient
 from frontend.components.chat_page import ChatPage
 from frontend.utils.constants import (BASE_URL, LOG_BACKTRACE, LOG_DIAGNOSE,
-                                      LOG_ENQUEUE, LOG_FILE_PATH, LOG_LEVEL,
-                                      LOG_RETENTION, LOG_ROTATION, NEW_CHAT)
+                                      LOG_ENQUEUE, LOG_LEVEL, NEW_CHAT)
 from frontend.utils.logos import BD_LOGO
 
 
 @cache
 def _setup_logger():
-    # Create log directory
-    log_path = Path(LOG_FILE_PATH)
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-
     # Remove default handler
     logger.remove()
 
@@ -37,11 +32,9 @@ def _setup_logger():
 
     # Add handler to logger
     logger.add(
-        sink=LOG_FILE_PATH,
+        sink=sys.stdout,
         level=LOG_LEVEL,
         format=_format,
-        rotation=LOG_ROTATION,
-        retention=LOG_RETENTION,
         backtrace=LOG_BACKTRACE,
         diagnose=LOG_DIAGNOSE,
         enqueue=LOG_ENQUEUE
@@ -109,27 +102,27 @@ def about():
 
     st.write("\n")
 
-    st.subheader("Bem Vindo(a)! :wave:")
+    st.subheader("Bem Vindo(a)! 👋")
     st.write(f"Bem vindo(a) ao chatbot da BD! Ele vai te ajudar a conversar com seus dados! Basta entrar na página de chat no menu à esquerda e começar a conversa. Faça perguntas sobre os dados disponíveis e o chatbot dará o seu melhor para respondê-las!", unsafe_allow_html=True)
 
     st.write("\n")
 
     # Available models
-    st.subheader("Modelo :brain:")
+    st.subheader("Modelo 🧠")
     st.write("O modelo por trás do chatbot é o Gemini, do Google.")
 
     st.write("\n")
 
     # Available features
-    st.subheader("Funcionalidades :memo:")
+    st.subheader("Funcionalidades 🛠️")
     st.write("""
-        - **Feedback (:material/thumb_up: ou :material/thumb_down:):** Clique nos botões de feedback para enviar feedbacks sobre as respostas recebidas, com comentários opcionais.
-        - **Excluir Conversa (:material/delete:):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. Essa ação é irreversível."""
+        - **Feedback (:material/thumb_up: ou :material/thumb_down:):** Clique nos botões de feedback para avaliar as respostas, com comentários opcionais.
+        - **Excluir Conversa (:material/delete:):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. As mensagens permanecerão salvas em nosso banco de dados para análise e melhoria do produto."""
     )
     st.write("\n")
 
     # Prompting guide
-    st.subheader("Guia de Prompt :clipboard:")
+    st.subheader("Guia de Prompt 📋")
     st.write("A forma como você conversa com o chatbot pode influenciar na qualidade das respostas! Por isso, abaixo estão listadas algumas dicas para te ajudar a elaborar suas perguntas. Elas podem ser úteis caso as respostas fornecidas estejam incorretas ou não sejam boas o suficiente!")
     st.write("""
         1. Tente fazer uma pergunta por vez. Caso sua pergunta seja muito complexa, ou talvez seja um conjunto de várias perguntas, tente separá-la em perguntas menores e mais simples.
@@ -140,8 +133,8 @@ def about():
     st.write("\n")
 
     # Important information
-    st.subheader("Importante :pushpin:")
-    st.info("Depois de enviar uma pergunta ao chatbot, espere até que uma resposta seja fornecida antes de trocar de página ou clicar em qualquer botão dentro da aplicação. Você pode alternar entre as abas do seu navegador normalmente.")
+    st.subheader("Importante 📌")
+    st.info("⏳ Depois de enviar uma pergunta ao chatbot, aguarde a resposta completa antes de trocar de página ou clicar em botões. Você pode alternar entre abas do navegador normalmente.")
 
 if st.session_state.get("logged_in"):
     about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
