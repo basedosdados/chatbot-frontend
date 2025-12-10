@@ -11,7 +11,7 @@ chatbotFrontend:
 
   # Environment variables
   env:
-    API_HOST: "localhost"
+    API_HOST: localhost
     API_PORT: 8000
     LOG_LEVEL: DEBUG
     LOG_BACKTRACE: true
