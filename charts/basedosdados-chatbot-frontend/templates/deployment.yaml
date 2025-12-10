@@ -34,9 +34,16 @@ spec:
           ports:
             - name: streamlit
               containerPort: 8501
-          volumeMounts:
-            - name: chatbot-log-volume
-              mountPath: /var/log/chatbot
+          env:
+            {{- $env := .Values.chatbotFrontend.env | default dict }}
+            - name: API_HOST
+              value: {{ required ".Values.chatbotFrontend.env.API_HOST is required" $env.API_HOST | quote }}
+            - name: API_PORT
+              value: {{ required ".Values.chatbotFrontend.env.API_PORT is required" $env.API_PORT | quote }}
+          {{- range $key, $value := omit $env "API_HOST" "API_PORT" }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+          {{- end }}
           {{- with .Values.chatbotFrontend.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -53,9 +60,4 @@ spec:
               port: 8501
             initialDelaySeconds: 10
             periodSeconds: 10
-      # TODO: use persistent volume
-      volumes:
-        - name: chatbot-log-volume
-          emptyDir:
-            sizeLimit: 500Mi
       restartPolicy: Always
