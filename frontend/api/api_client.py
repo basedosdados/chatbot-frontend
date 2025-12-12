@@ -1,14 +1,15 @@
+from datetime import datetime, timedelta
 from typing import Iterator
 from uuid import UUID, uuid4
 
 import httpx
 import jwt
+import streamlit as st
 from loguru import logger
 
 from frontend.datatypes import (EventData, MessagePair, StreamEvent, Thread,
                                 UserMessage)
-
-from datetime import datetime, timedelta
+from frontend.exceptions import SessionExpiredException
 
 
 class APIClient:
@@ -22,8 +23,8 @@ class APIClient:
             return True
 
         try:
-            decoded = jwt.decode(token, options={"verify_signature": False})
-            exp = decoded.get("exp")
+            payload: dict = jwt.decode(token, options={"verify_signature": False})
+            exp = payload.get("exp")
             if not exp:
                 return True
             expiration = datetime.fromtimestamp(exp)
@@ -31,31 +32,49 @@ class APIClient:
         except Exception:
             return True
 
-    def _refresh_access_token(self, refresh_token: str) -> str|None:
-        """Refresh the access token using refresh token."""
-        try:
-            response = httpx.post(
-                f"{self.base_url}/chatbot/token/refresh/",
-                json={"refresh": refresh_token}
-            )
-            response.raise_for_status()
-            access_token = response.json()["access"]
-            self.logger.success("[AUTH] Access token refreshed successfully")
-            return access_token
-        except httpx.HTTPStatusError:
-            if response.status_code == httpx.codes.UNAUTHORIZED:
-                self.logger.warning(f"[AUTH] Refresh token expired")
-        except Exception:
-            self.logger.exception("[AUTH] Failed to refresh token:")
-        return None
+    def _refresh_access_token(self, refresh_token: str) -> str:
+        """Refresh the access token using a refresh token.
+
+        Args:
+            refresh_token (str): The refresh token.
+
+        Returns:
+            str: A refreshed access token.
+        """
+        response = httpx.post(
+            f"{self.base_url}/chatbot/token/refresh/",
+            json={"refresh": refresh_token}
+        )
+        response.raise_for_status()
+        access_token = response.json()["access"]
+        return access_token
 
     def _get_headers(self, access_token: str, refresh_token: str) -> dict[str, str]:
+        """Get authorization headers, refreshing access token as needed.
+
+        Args:
+            access_token (str): The access token.
+            refresh_token (str): The refresh token.
+
+        Raises:
+            SessionExpiredException: If refresh token is expired (401).
+
+        Returns:
+            dict[str, str]: The authorization headers,
+        """
         if self._is_token_expired(access_token):
             self.logger.info("[AUTH] Access token expired, refreshing...")
-            access_token = self._refresh_access_token(refresh_token)
-        if access_token is not None:
-            return {"Authorization": f"Bearer {access_token}"}
-        return None
+            try:
+                access_token = self._refresh_access_token(refresh_token)
+                st.session_state["access_token"] = access_token
+                self.logger.success("[AUTH] Access token refreshed successfully")
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == httpx.codes.UNAUTHORIZED:
+                    self.logger.info("[AUTH] Refresh token expired")
+                    raise SessionExpiredException from e
+                raise  # Re-raise other HTTP errors
+
+        return {"Authorization": f"Bearer {access_token}"}
 
     def authenticate(self, email: str, password: str) -> tuple[str|None, str|None, str]:
         """Send a post request to the authentication endpoint.
@@ -124,6 +143,8 @@ class APIClient:
             thread = Thread(**response.json())
             self.logger.success(f"[THREAD] Thread created successfully for user {thread.account}")
             return thread
+        except SessionExpiredException:
+            raise
         except Exception:
             self.logger.exception(f"[THREAD] Error on thread creation:")
             return None
@@ -149,6 +170,8 @@ class APIClient:
             threads = [Thread(**thread) for thread in response.json()]
             self.logger.success(f"[THREAD] Threads retrieved successfully")
             return threads
+        except SessionExpiredException:
+            raise
         except Exception:
             self.logger.exception(f"[THREAD] Error on threads retrieval:")
             return None
@@ -175,6 +198,8 @@ class APIClient:
             message_pairs = [MessagePair(**pair) for pair in response.json()]
             self.logger.success(f"[MESSAGE] Message pairs retrieved successfully for thread {thread_id}")
             return message_pairs
+        except SessionExpiredException:
+            raise
         except Exception:
             self.logger.exception(f"[MESSAGE] Error on message pairs retrieval for thread {thread_id}:")
             return None
@@ -220,6 +245,8 @@ class APIClient:
                         stream_completed = True
 
                     yield event
+        except SessionExpiredException:
+            raise
         except httpx.ReadTimeout:
             self.logger.exception(f"[MESSAGE] Timeout error on sending user message:")
             error_message=(
@@ -277,6 +304,8 @@ class APIClient:
             response.raise_for_status()
             self.logger.success(f"[FEEDBACK] Feedback sent successfully")
             return True
+        except SessionExpiredException:
+            raise
         except Exception:
             self.logger.exception(f"[FEEDBACK] Error on sending feedback:")
             return False
@@ -303,6 +332,8 @@ class APIClient:
             response.raise_for_status()
             self.logger.success(f"[CLEAR] Assistant memory cleared successfully")
             return True
+        except SessionExpiredException:
+            raise
         except Exception:
             self.logger.exception("[CLEAR] Error on clearing assistant memory:")
             return False
