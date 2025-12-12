@@ -54,6 +54,7 @@ def login():
     st.caption("Por favor, insira seu e-mail e senha para continuar")
 
     access_token = None
+    refresh_token = None
     message = None
 
     with st.form("register_form"):
@@ -63,10 +64,16 @@ def login():
         col1, _ = st.columns(2)
 
         if col1.form_submit_button("Entrar", type="primary"):
-            access_token, message = api.authenticate(email, password)
+            access_token, refresh_token, message = api.authenticate(email, password)
 
-    if access_token is not None:
-        threads = api.get_threads(access_token)
+    if access_token and refresh_token:
+        st.session_state["email"] = email
+        st.session_state["logged_in"] = True
+        st.session_state["access_token"] = access_token
+        st.session_state["refresh_token"] = refresh_token
+        st.session_state["user_avatar"] = f"https://api.dicebear.com/9.x/initials/svg?seed={email[0]}&backgroundColor=7ec876&radius=50"
+
+        threads = api.get_threads(access_token, refresh_token)
 
         if threads is not None:
             st.session_state["chat_pages"] = [
@@ -76,10 +83,6 @@ def login():
         else:
             st.session_state["chat_pages"] = []
 
-        st.session_state["email"] = email
-        st.session_state["user_avatar"] = f"https://api.dicebear.com/9.x/initials/svg?seed={email[0]}&backgroundColor=7ec876&radius=50"
-        st.session_state["logged_in"] = True
-        st.session_state["access_token"] = access_token
         st.success(message, icon=":material/check:")
         time.sleep(0.5)
         st.rerun()

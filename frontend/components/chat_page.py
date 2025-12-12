@@ -40,6 +40,7 @@ class ChatPage:
         """
         thread = self.api.create_thread(
             access_token=st.session_state["access_token"],
+            refresh_token=st.session_state["refresh_token"],
             title=title,
         )
 
@@ -69,6 +70,7 @@ class ChatPage:
         def show_feedback_popup():
             feedback = st.session_state[feedback_id]
             access_token = st.session_state["access_token"]
+            refresh_token = st.session_state["refresh_token"]
 
             if feedback:
                 placeholder = "O que foi satisfatório na resposta?"
@@ -96,6 +98,7 @@ class ChatPage:
                 if col1.button("Enviar", type="primary"):
                     if self.api.send_feedback(
                         access_token=access_token,
+                        refresh_token=refresh_token,
                         message_pair_id=message_pair_id,
                         rating=feedback,
                         comments=comments
@@ -189,6 +192,7 @@ class ChatPage:
             if col2.button("Sim, excluir", type="primary"):
                 deleted = self.api.delete_thread(
                     access_token=st.session_state["access_token"],
+                    refresh_token=st.session_state["refresh_token"],
                     thread_id=self.thread_id
                 )
 
@@ -257,6 +261,7 @@ class ChatPage:
             if self.thread_id is not None:
                 message_pairs = self.api.get_message_pairs(
                     access_token=st.session_state["access_token"],
+                    refresh_token=st.session_state["refresh_token"],
                     thread_id=self.thread_id
                 )
             else:
@@ -329,6 +334,7 @@ class ChatPage:
 
                 for event in self.api.send_message(
                     access_token=st.session_state["access_token"],
+                    refresh_token=st.session_state["refresh_token"],
                     message=user_prompt,
                     thread_id=self.thread_id
                 ):
