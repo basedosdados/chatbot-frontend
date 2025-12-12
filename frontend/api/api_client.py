@@ -18,7 +18,14 @@ class APIClient:
         self.logger = logger.bind(classname=self.__class__.__name__)
 
     def _is_token_expired(self, token: str) -> bool:
-        """Check if token is expired or about to expire (within 1 minute)."""
+        """Check if a JWT token is expired or about to expire (within 1 minute).
+
+        Args:
+            token (str): The token.
+
+        Returns:
+            bool: Whether the token is expired or not.
+        """
         if not token:
             return True
 
