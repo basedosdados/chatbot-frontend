@@ -388,12 +388,12 @@ class ChatPage:
                     # NOTE: These specific buttons are discarded on the st.rerun() below,
                     # and then re-rendered from the chat history on the next pass.
                     self._render_message_buttons(message_pair)
-
-                    # Add message pair to chat history
-                    chat_history.append(message_pair)
                 except SessionExpiredException:
                     _show_session_expired_dialog()
                     return
+
+            # Add message pair to chat history
+            chat_history.append(message_pair)
 
         # Render the chat deletion button
         self._render_delete_button()
