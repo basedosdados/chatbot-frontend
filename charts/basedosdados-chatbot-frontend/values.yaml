@@ -1,0 +1,49 @@
+# Chatbot Frontend configuration
+chatbotFrontend:
+  # Deployment name
+  name: basedosdados-chatbot-frontend
+
+  # Deployment image
+  image:
+    name: ghcr.io/basedosdados/chatbot-frontend
+    tag: stable
+    pullPolicy: Always
+
+  # Environment variables
+  env:
+    API_HOST: localhost
+    API_PORT: 8000
+    LOG_LEVEL: DEBUG
+    LOG_BACKTRACE: true
+    LOG_DIAGNOSE: false
+    LOG_ENQUEUE: true
+
+  # Number of replicas
+  replicas: 1
+
+  # Resource specification
+  resources:
+    requests:
+      cpu: 250m
+      memory: 500Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  # Ingress configuration
+  ingress:
+    # Enable ingress
+    enabled: true
+    # Host to be used in the ingress
+    host: ""
+    # Ingress annotations
+    annotations:
+      nginx.ingress.kubernetes.io/use-regex: "true"
+      nginx.ingress.kubernetes.io/rewrite-target: /$2
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+      cert-manager.io/issuer: letsencrypt-production
+    # TLS configuration
+    tls:
+      - hosts:
+          - ""
+        secretName: ""

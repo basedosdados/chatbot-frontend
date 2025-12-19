@@ -1,2 +1,3 @@
-from .constants import *
-from .icons import AVATARS
+from .utils import escape_currency
+
+__all__ = ["escape_currency"]

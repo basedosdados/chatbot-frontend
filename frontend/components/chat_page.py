@@ -1,434 +1,288 @@
-from datetime import datetime
-from uuid import UUID
+import json
+import uuid
+from typing import Any
 
-import pandas as pd
-import plotly.express as px
+import sqlparse
 import streamlit as st
 from loguru import logger
 from streamlit.delta_generator import DeltaGenerator
+from streamlit_extras.stylable_container import stylable_container
 
 from frontend.api import APIClient
 from frontend.components import *
-from frontend.datatypes import MessagePair
-from frontend.utils.icons import AVATARS
+from frontend.datatypes import MessagePair, StreamEvent
+from frontend.exceptions import SessionExpiredException
+from frontend.utils.constants import NEW_CHAT
+from frontend.utils.logos import BD_LOGO
 
 
 class ChatPage:
     chat_history_key = "chat_history"
-    chat_buttons_key = "chat_buttons"
+    delete_btn_key = "delete_btn"
     feedbacks_key = "feedbacks"
+    feedback_clicked_key = "feedback_clicked"
     waiting_key = "waiting_for_answer"
 
-    example_prompts = [
-        {"icon": "auto_stories", "text": "Qual foi a porcentagem de alunos leitores por raça/cor nas avaliações de saída de 2023?"},
-        {"icon": "auto_stories", "text": "Qual foi o ideb médio em 2023 nos municípios onde temos EpV para os anos iniciais?"},
-        {"icon": "school", "text": "Qual a porcentagem de egressos que ocupam posições de autoridade formal, por organização?"},
-    ]
-
-    def __init__(self, api: APIClient, title: str):
+    def __init__(self, api: APIClient, title: str | None = None, thread_id: str | None = None):
         self.api = api
         self.title = title
-        self.page_name = title.lower()
+        self.thread_id = thread_id
+        self.page_id = str(uuid.uuid4())
         self.logger = logger.bind(classname=self.__class__.__name__)
 
-        st.set_page_config(
-            page_title=self.title,
-            page_icon=AVATARS["assistant"]
-        )
-
-    def _handle_click_feedback(self, feedback_id: str, show_comments_id: str):
-        """Update the feedback buttons state and the comments text input flag on session state
+    def _create_thread_and_register(self, title: str) -> bool:
+        """Create a thread for this chat page and add itself to the chat pages list.
 
         Args:
-            feedback_id (str): The feedback button identifier
-            show_comments_id (str): The comments text input flag identifier
+            title (str): The thread title.
+
+        Returns:
+            bool: Whether the thread creation was successful.
+        """
+        try:
+            thread = self.api.create_thread(
+                access_token=st.session_state["access_token"],
+                refresh_token=st.session_state["refresh_token"],
+                title=title,
+            )
+
+            if thread is not None:
+                self.title = thread.title
+                self.thread_id = thread.id
+                chat_pages: list[ChatPage] = st.session_state["chat_pages"]
+                chat_pages.append(self)
+                return True
+            else:
+                _show_error_popup("Não foi possível criar a thread. Por favor, inicie uma nova conversa.")
+                return False
+        except SessionExpiredException:
+            _show_session_expired_dialog()
+
+    def _handle_send_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
+        """Handle feedback sending.
+
+        Args:
+            feedback_id (str): The feedback button identifier.
+            message_pair_id (uuid.UUID): The message pair identifier.
+        """
+        def reset_feedback_state():
+            page_feedbacks: dict = st.session_state[self.page_id][self.feedbacks_key]
+            st.session_state[feedback_id] = page_feedbacks.get(feedback_id)
+            st.session_state[self.page_id][self.feedback_clicked_key] = False
+
+        @st.dialog("Feedback", on_dismiss=reset_feedback_state)
+        def show_feedback_popup():
+            feedback = st.session_state[feedback_id]
+            access_token = st.session_state["access_token"]
+            refresh_token = st.session_state["refresh_token"]
+
+            if feedback:
+                placeholder = "O que foi satisfatório na resposta?"
+            else:
+                placeholder = "O que foi insatisfatório na resposta?"
+
+            comments = st.text_area(
+                label=":gray[Comentários adicionais (opcional)]",
+                placeholder=placeholder,
+                value=None,
+            )
+
+            error_placeholder = st.empty()
+
+            with stylable_container(
+                key="feedback_dialog_buttons",
+                css_styles="""
+                    button {
+                        white-space: nowrap;
+                    }
+                """
+            ):
+                _, col1, col2 = st.columns([0.64, 0.18, 0.22])
+
+                if col1.button("Enviar", type="primary"):
+                    try:
+                        if self.api.send_feedback(
+                            access_token=access_token,
+                            refresh_token=refresh_token,
+                            message_pair_id=message_pair_id,
+                            rating=feedback,
+                            comments=comments
+                        ):
+                            page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
+                            page_feedbacks[feedback_id] = feedback
+                            st.session_state[self.page_id][self.feedback_clicked_key] = False
+                            st.rerun()
+                        else:
+                            error_placeholder.error("Não foi possível enviar o feedback.", icon=":material/error:")
+                    except SessionExpiredException:
+                        error_placeholder.warning("Sua sessão expirou. Faça login novamente.", icon=":material/schedule:")
+
+                if col2.button("Cancelar"):
+                    reset_feedback_state()
+                    st.rerun()
+
+        show_feedback_popup()
+
+    def _handle_click_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
+        """Handle feedback buttons click and open the feedback dialog.
+
+        Args:
+            feedback_id (str): The feedback button identifier.
+            message_pair_id (uuid.UUID): The message pair identifier.
         """
         feedback = st.session_state[feedback_id]
 
-        page_feedbacks = st.session_state[self.page_name][self.feedbacks_key]
+        page_feedbacks: dict = st.session_state[self.page_id][self.feedbacks_key]
 
-        # The _handle_click_feedback method is being called sometimes when changing
-        # pages and then coming back, so some guard clauses had to be used
-        # to avoid empty or duplicated feedbacks sending
-
-        # First, we must check if the feedback is None
+        # If feedback is None *after* a button click, it means Streamlit
+        # is resetting the button state, which we don’t want. In this case,
+        # restore it to its previous value.
         if feedback is None:
-            return
+            st.session_state[feedback_id] = page_feedbacks.get(feedback_id)
 
-        # Then, we must check if the feedback is the same as the last sent feedback
-        if feedback_id in page_feedbacks and page_feedbacks[feedback_id] == feedback:
-            return
-
-        # Finally, we update it on the session state
-        page_feedbacks[feedback_id] = feedback
-
-        # And show the comments text input
-        st.session_state[show_comments_id] = True
-
-    def _handle_send_feedback(
-        self,
-        feedback_id: str,
-        message_pair_id: UUID,
-        show_comments_id: str,
-        comments: str
-    ):
-        """Handle feedback sending
-
-        Args:
-            feedback_id (str): The feedback id
-            message_pair_id (UUID): The message pair id
-            show_comments_id (str): The show_comments flag id
-            comments (str): The comments
-        """
-        rating = st.session_state[feedback_id]
-        access_token = st.session_state["access_token"]
-
-        if not self.api.send_feedback(
-            access_token=access_token,
-            message_pair_id=message_pair_id,
-            rating=rating,
-            comments=comments
-        ):
-            show_error_popup("Não foi possível enviar o feedback.")
-
-        st.session_state[show_comments_id] = False
-
-    @staticmethod
-    def _plot_chart(placeholder: DeltaGenerator, message_pair: MessagePair):
-        data = pd.DataFrame(message_pair.chart_data.data)
-        data = data.fillna("N/A")
-
-        metadata = message_pair.chart_metadata
-
-        human_friendly_labels = {
-            metadata.x_axis: metadata.x_axis_title,
-            metadata.y_axis: metadata.y_axis_title,
-        }
-
-        if metadata.valid_label is not None:
-            human_friendly_labels[metadata.valid_label] = metadata.label_title
-
-        kwargs = {
-            "x": metadata.x_axis,
-            "y": metadata.y_axis,
-            "color": metadata.valid_label,
-            "labels": human_friendly_labels,
-            "title": metadata.title
-        }
-
-        match metadata.chart_type:
-            case "bar":
-                fig = px.bar(data, **kwargs)
-            case "horizontal_bar":
-                fig = px.bar(data, orientation="h", **kwargs)
-            case "line":
-                fig = px.line(data, markers=True, **kwargs)
-            case "pie":
-                kwargs["names"] = kwargs.pop("x")
-                kwargs["values"] = kwargs.pop("y")
-                fig = px.pie(data, hole=0.5, **kwargs)
-            case "scatter":
-                fig = px.scatter(data, **kwargs)
-            case _:
-                raise NotImplementedError(f"{metadata.chart_type} chart is not implemented")
-
-        fig.update_layout(margin={"b": 0})
-
-        placeholder.plotly_chart(fig)
-
-    def _toggle_flag(self, flag_id: str):
-        """Toggle a flag on session state
-
-        Args:
-            flag_id (str): The flag identifier
-        """
-        st.session_state[flag_id] = not st.session_state[flag_id]
+        # Finally, set the feedback clicked flag and open the feedback dialog
+        st.session_state[self.page_id][self.feedback_clicked_key] = True
+        self._handle_send_feedback(feedback_id, message_pair_id)
 
     def _render_message_buttons(self, message_pair: MessagePair):
-        """Render the code-showing button and all the feedback related widgets on assistant's messages
+        """Render the feedback buttons on assistant's messages.
 
         Args:
             message_pair (MessagePair):
                 A MessagePair object containing:
-                    - id: unique identifier
-                    - thread_id: thread unique identifier
-                    - model_uri: uri for the assistant's model
-                    - user_message: user message
-                    - assistant_message: assistant message
-                    - generated_queries: generated sql queries
-                    - generated_chart: generated data for visualization
-                    - created_at: message pair creation timestamp
+                    - id: unique identifier.
+                    - user_message: user message.
+                    - assistant_message: assistant message.
+                    - error_message: error message.
+                    - events: list of streamed events.
         """
-        # Placeholder for showing the generated chart
-        chart_placeholder = st.empty()
+        # Checks if the model is still answering the question.
+        # If so, all message buttons are disabled
+        waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
 
-        # Placeholder for showing the generated SQL queries
-        code_placeholder = st.empty()
-
-        # Container for feedback widgets
-        feedback_container = st.container()
-
-        # Creates four columns:
-        # the first one is for the code-showing button
-        # the second one is for the feedback buttons
-        # the third one is for the comments input
-        # the fourth one is for the feedback sending button
-        col0, col1, col2, col3, col4 = feedback_container.columns(
-            (0.06, 0.06, 0.12, 0.86, 0.1),
-            vertical_alignment="center"
-        )
-
-        # Checks if the model is still answering the last question.
-        # If yes, all message buttons and comments inputs will be disabled
-        waiting_for_answer = st.session_state[self.page_name][self.waiting_key]
-
-        # Unique flag and button key for chart-showing
-        show_chart_id = f"show_chart_{message_pair.id}"
-        show_chart_btn_id = f"show_chart_btn_{message_pair.id}"
-
-        # Unique flag and button key for code-showing
-        show_code_id = f"show_code_{message_pair.id}"
-        show_code_btn_id = f"show_code_btn_{message_pair.id}"
-
-        # Unique identifiers for the feedback buttons widget
-        # and for a flag that determines if the comments input should be shown
+        # Unique identifier for the feedback buttons widget
         feedback_id = f"feedback_{message_pair.id}"
-        comments_input_id = f"comments_input_{message_pair.id}"
-        show_comments_id = f"show_comments_{message_pair.id}"
-        send_comments_id = f"send_comments_{message_pair.id}"
-
-        # By default, the codes should be hidden
-        if show_code_id not in st.session_state:
-            st.session_state[show_code_id] = False
-
-        # By default, the charts should be displayed if any are available
-        if show_chart_id not in st.session_state:
-            st.session_state[show_chart_id] = message_pair.has_valid_chart
-
-        # By default, the comments input should be hidden
-        if show_comments_id not in st.session_state:
-            st.session_state[show_comments_id] = False
 
         # Look for the feedback buttons widget in the session state
-        page_feedbacks = st.session_state[self.page_name][self.feedbacks_key]
+        page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
 
-        # And keep its state if it already existed in the session
-        if feedback_id in page_feedbacks:
+        # Restore previous feedback state if it already exists in the session
+        # and no feedback was clicked in this run, to persist state across reruns
+        if (
+            feedback_id in page_feedbacks and
+            not st.session_state[self.page_id][self.feedback_clicked_key]
+        ):
             last_feedback = page_feedbacks[feedback_id]
             st.session_state[feedback_id] = last_feedback
 
-        # Renders the chart-showing button
-        with col0:
-            with chart_button_container():
-                st.button(
-                    " ",
-                    key=show_chart_btn_id,
-                    on_click=self._toggle_flag,
-                    args=(show_chart_id,),
-                    disabled=waiting_for_answer
-                )
-
-        # If the chart-showing flag is set, shows the generated chart
-        if st.session_state[show_chart_id]:
-            if message_pair.has_valid_chart:
-                try:
-                    self._plot_chart(chart_placeholder, message_pair)
-                except Exception:
-                    self.logger.exception(f"Error on plotting chart for message pair {message_pair.id}:")
-                    chart_placeholder.error("Ops! Algo deu errado na exibição do gráfico.")
-            elif message_pair.has_chart:
-                chart_placeholder.error("Ops! Ocorreu um erro na criação do gráfico.")
-            else:
-                chart_placeholder.info("Nenhum gráfico foi gerado.")
-
-        # Renders the code-showing button
-        with col1:
-            with code_button_container():
-                st.button(
-                    " ",
-                    key=show_code_btn_id,
-                    on_click=self._toggle_flag,
-                    args=(show_code_id,),
-                    disabled=waiting_for_answer
-                )
-
-        # If the code-showing flag is set, shows the generated sql queries
-        if st.session_state[show_code_id]:
-            if message_pair.generated_queries is not None:
-                code_placeholder.write(message_pair.formatted_sql_queries)
-            else:
-                code_placeholder.info("Nenhuma consulta SQL foi gerada.")
-
-        # Renders the feedback buttons
-        col2.feedback(
+        # Render the feedback buttons
+        st.feedback(
             "thumbs",
             key=feedback_id,
             on_change=self._handle_click_feedback,
-            args=(feedback_id, show_comments_id),
+            args=(feedback_id, message_pair.id),
             disabled=waiting_for_answer
         )
 
-        # If the flag is set, shows the comments input and the sending button
-        if st.session_state[show_comments_id]:
-            comments = col3.text_input(
-                "comments",
-                key=comments_input_id,
-                value=None,
-                placeholder="Comentários adicionais (opcional)",
-                label_visibility="collapsed",
-                disabled=waiting_for_answer
-            )
+    def _render_delete_button(self):
+        """Render the chat deletion button."""
+        @st.dialog("Excluir conversa")
+        def show_delete_chat_modal():
+            st.markdown("") # just for spacing
+            st.text("Tem certeza que deseja excluir esta conversa permanentemente?")
 
-            # If the sending button is pressed, sends the feedback and comments
-            # to the backend and hides the comments input and the sending button
-            col4.button(
-                ":material/send:",
-                key=send_comments_id,
-                on_click=self._handle_send_feedback,
-                args=(
-                    feedback_id,
-                    message_pair.id,
-                    show_comments_id,
-                    comments
-                ),
-                disabled=waiting_for_answer
-            )
+            warning_placeholder = st.empty()
 
-    def _chat_to_csv(self) -> bytes:
-        """Create a csv file containing the chat history questions and answers
+            col1, col2, _ = st.columns([1.1, 2.1, 2])
 
-        Returns:
-            bytes: The utf-8 encoded csv file
-        """
-        page_session_state = st.session_state[self.page_name]
-        chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
+            if col1.button("Cancelar"):
+                st.rerun()
 
-        models = []
-        user_messages = []
-        assistant_messages = []
-        generated_queries = []
+            if col2.button("Sim, excluir", type="primary"):
+                try:
+                    deleted = self.api.delete_thread(
+                        access_token=st.session_state["access_token"],
+                        refresh_token=st.session_state["refresh_token"],
+                        thread_id=self.thread_id
+                    )
 
-        for message_pair in chat_history:
-            models.append(message_pair.model_uri)
-            user_messages.append(message_pair.user_message)
-            assistant_messages.append(message_pair.assistant_message)
+                    if not deleted:
+                        st.error("Não foi possível excluir a conversa.", icon=":material/error:")
+                        return
 
-            if message_pair.generated_queries is not None:
-                queries = "\n\n".join(message_pair.generated_queries)
-            else:
-                queries = None
+                    chat_pages: list[ChatPage] = st.session_state["chat_pages"]
 
-            generated_queries.append(queries)
+                    for i, chat_page in enumerate(chat_pages):
+                        if chat_page.thread_id == self.thread_id:
+                            chat_pages.pop(i)
+                            break
 
-        return pd.DataFrame({
-            "modelo": models,
-            "pergunta": user_messages,
-            "resposta": assistant_messages,
-            "consulta": generated_queries,
-        }).to_csv(index=False).encode("utf-8")
+                    st.rerun()
+                except SessionExpiredException:
+                    warning_placeholder.warning("Sua sessão expirou. Faça login novamente.", icon=":material/schedule:")
 
-    def _reset_page(self):
-        """Reset the page session state and delete everything related to its
-        chat history from the app session state. Also clears the assistant memory
-        """
-        page_session_state = st.session_state[self.page_name]
+        page_session_state = st.session_state[self.page_id]
+        chat_delete_disabled = page_session_state[self.delete_btn_key]
 
-        _ = self.api.clear_thread(
-            access_token=st.session_state["access_token"],
-            thread_id=page_session_state["thread_id"]
-        )
-
-        chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
-
-        for message_pair in chat_history:
-            for k, v in st.session_state.items():
-                if str(message_pair.id) in k:
-                    del st.session_state[k]
-
-        del st.session_state[self.page_name]
-
-    def _handle_user_interaction(self):
-        """Disable all chat message buttons, comments inputs and the chat input while the model
-        is answering a question and enable the chat reset and download buttons rendering
-        """
-        st.session_state[self.page_name][self.chat_buttons_key] = False
-        st.session_state[self.page_name][self.waiting_key] = True
-
-    def _render_chat_buttons(self):
-        """Render the chat reset and download buttons"""
-        page_session_state = st.session_state[self.page_name]
-        chat_reset_disabled = page_session_state[self.chat_buttons_key]
-
-        if chat_reset_disabled:
+        if chat_delete_disabled:
             return
 
-        container = st.container()
-
-        col1, col2, _ = container.columns((1, 1, 13))
-
-        col1.button(
-            ":material/refresh:",
-            on_click=self._reset_page,
+        st.button(
+            label="Excluir",
+            icon=":material/delete:",
+            on_click=show_delete_chat_modal,
         )
 
-        col2.download_button(
-            ":material/download:",
-            data=self._chat_to_csv(),
-            file_name=f"{self.page_name.replace(' ', '_')}_{datetime.now().strftime('%F_%T')}.csv"
-        )
+    def _handle_user_interaction(self):
+        """Disable all chat message buttons, comments inputs and the chat input while
+        the model is answering a question and enable the chat deletion button rendering.
+        """
+        st.session_state[self.page_id][self.delete_btn_key] = False
+        st.session_state[self.page_id][self.waiting_key] = True
 
     def render(self):
-        """Render the chat page"""
-        # Show three example prompts
-        columns = st.columns(3)
-        for col, example in zip(columns, self.example_prompts):
-            with col:
-                render_card(
-                    icon=example["icon"],
-                    text=example["text"],
-                )
-
-        # Unfortunately, this is necessary for the code-showing button customization
-        st.markdown(
-            """<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>""",
-            unsafe_allow_html=True
-        )
-
+        """Render the chat page."""
         # Placeholder for the subheader message
         subheader = st.empty()
 
         # Initialize page session state
-        if self.page_name not in st.session_state:
-            st.session_state[self.page_name] = {}
+        if self.page_id not in st.session_state:
+            st.session_state[self.page_id] = {}
 
-        page_session_state = st.session_state[self.page_name]
+        page_session_state = st.session_state[self.page_id]
 
-        # Get thread id
-        if "thread_id" not in page_session_state:
-            thread_id = self.api.create_thread(
-                access_token=st.session_state["access_token"]
-            )
-            if thread_id is not None:
-                page_session_state["thread_id"] = thread_id
-            else:
-                show_error_popup("Não foi possível criar a thread.")
+        # Initialize feedback history
+        if self.feedbacks_key not in page_session_state:
+            page_session_state[self.feedbacks_key] = {}
+
+        # Initialize flag to check if the feedback button is clicked
+        if self.feedback_clicked_key not in page_session_state:
+            page_session_state[self.feedback_clicked_key] = False
 
         # Initialize the waiting key, which is used to prevent users from
         # interacting with the app while the model is answering a question
         if self.waiting_key not in page_session_state:
             page_session_state[self.waiting_key] = False
 
+        # Initialize chat deletion flag
+        if self.delete_btn_key not in page_session_state:
+            page_session_state[self.delete_btn_key] = self.thread_id is None
+
         # Initialize chat history state
         if self.chat_history_key not in page_session_state:
-            page_session_state[self.chat_history_key] = []
-
-        # Initialize feedback history
-        if self.feedbacks_key not in page_session_state:
-            page_session_state[self.feedbacks_key] = {}
-
-        # Initialize reset flag state
-        if self.chat_buttons_key not in page_session_state:
-            page_session_state[self.chat_buttons_key] = True
+            if self.thread_id is not None:
+                try:
+                    message_pairs = self.api.get_message_pairs(
+                        access_token=st.session_state["access_token"],
+                        refresh_token=st.session_state["refresh_token"],
+                        thread_id=self.thread_id
+                    )
+                except SessionExpiredException:
+                    _show_session_expired_dialog()
+                    return
+            else:
+                message_pairs = []
+            page_session_state[self.chat_history_key] = message_pairs or []
 
         chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
 
@@ -437,14 +291,31 @@ class ChatPage:
             with subheader:
                 typewrite("Como posso ajudar?")
 
+        user_avatar = st.session_state.get("user_avatar")
+
         # Display chat messages from history on app rerun
         for message_pair in chat_history:
-            with st.chat_message("user", avatar=AVATARS["user"]):
+            with st.chat_message("user", avatar=user_avatar):
                 st.write(message_pair.user_message)
 
-            with st.chat_message("assistant", avatar=AVATARS["assistant"]):
+            with st.chat_message("assistant", avatar=BD_LOGO):
                 st.empty()
-                st.write(message_pair.assistant_message)
+
+                if _has_tool_events(message_pair.events):
+                    if message_pair.assistant_message is not None:
+                        label, state = "Concluído! Clique para ver os detalhes", "complete"
+                    else:
+                        label, state = "Erro", "error"
+
+                    with st.status(label=label, state=state):
+                        for event in message_pair.events:
+                            _display_tool_event(event)
+
+                if message_pair.assistant_message is not None:
+                    st.write(message_pair.formatted_assistant_message)
+                else:
+                    st.error(message_pair.error_message)
+
                 self._render_message_buttons(message_pair)
 
         # Accept user input
@@ -457,42 +328,238 @@ class ChatPage:
             subheader.empty()
 
             # Display user message in chat message container
-            with st.chat_message("user", avatar=AVATARS["user"]):
+            with st.chat_message("user", avatar=user_avatar):
                 st.write(user_prompt)
 
+            # Create thread only in the first message
+            if (
+                self.thread_id is None and not
+                self._create_thread_and_register(title=user_prompt)
+            ):
+                _clear_new_chat_page()
+                return
+
             # Display assistant response in chat message container
-            with st.chat_message("assistant", avatar=AVATARS["assistant"]):
-                three_dots_placeholder = st.empty()
+            with st.chat_message("assistant", avatar=BD_LOGO):
+                events = []
+                error_message = None
+                assistant_message = None
+                status_placeholder = st.empty()
 
-                with three_dots_placeholder:
-                    three_pulsing_dots()
+                status = status_placeholder.status("Pensando...")
 
-                message_pair = self.api.send_message(
-                    access_token=st.session_state["access_token"],
-                    message=user_prompt,
-                    thread_id=page_session_state["thread_id"]
-                )
+                try:
+                    for event in self.api.send_message(
+                        access_token=st.session_state["access_token"],
+                        refresh_token=st.session_state["refresh_token"],
+                        message=user_prompt,
+                        thread_id=self.thread_id
+                    ):
+                        events.append(event)
 
-                three_dots_placeholder.empty()
+                        if event.type == "final_answer":
+                            assistant_message = event.data.content
+                            label, state = "Concluído! Clique para ver os detalhes", "complete"
+                        elif event.type == "error":
+                            error_message = event.data.error_details.get("message", "Erro")
+                            label, state = "Erro", "error"
+                        elif event.type == "complete":
+                            message_pair = MessagePair(
+                                id=event.data.run_id,
+                                user_message=user_prompt,
+                                assistant_message=assistant_message,
+                                error_message=error_message,
+                                events=events
+                            )
+                            if _has_tool_events(message_pair.events):
+                                status.update(label=label, state=state)
+                            else:
+                                status_placeholder.empty()
+                        else:
+                            status.update(label="Consultando a Base dos Dados...")
+                            _display_tool_event(event, container=status)
 
-                _ = st.write_stream(message_pair.stream_words)
+                    if message_pair.assistant_message is not None:
+                        st.write_stream(message_pair.stream_words)
+                    else:
+                        st.error(message_pair.error_message)
 
-                # Render the message buttons
-                self._render_message_buttons(message_pair)
+                    # Render buttons immediately to ensure a complete UI before the reload.
+                    # NOTE: These specific buttons are discarded on the st.rerun() below,
+                    # and then re-rendered from the chat history on the next pass.
+                    self._render_message_buttons(message_pair)
+                except SessionExpiredException:
+                    _show_session_expired_dialog()
+                    return
 
             # Add message pair to chat history
             chat_history.append(message_pair)
 
-        # Render the chat buttons
-        self._render_chat_buttons()
+        # Render the chat deletion button
+        self._render_delete_button()
 
         # Render the disclaimer messages
         render_disclaimer()
 
         if page_session_state[self.waiting_key]:
             page_session_state[self.waiting_key] = False
-            st.rerun()
+
+            new_chat: ChatPage | None = st.session_state[NEW_CHAT]
+
+            # If this page is a new chat page, switch to it
+            if new_chat and new_chat.page_id == self.page_id:
+                _clear_new_chat_page()
+
+                current_page = st.Page(
+                    page=self.render,
+                    title=self.title,
+                    url_path=str(self.thread_id)
+                )
+
+                st.switch_page(current_page)
+            # Otherwise, we're already on it, so just rerun
+            else:
+                st.rerun()
+
 
 @st.dialog("Erro")
-def show_error_popup(message: str):
+def _show_error_popup(message: str):
+    """Display an error message in a modal.
+
+    Args:
+        message (str): The error message.
+    """
     st.text(message)
+
+
+@st.dialog(":material/schedule: Sessão Expirada")
+def _show_session_expired_dialog():
+    st.write("Sua sessão expirou. Faça login novamente.")
+    if st.button("Ir para o login", type="primary"):
+        st.session_state.clear()
+        st.rerun()
+
+
+def _clear_new_chat_page():
+    """Clear new chat page on session state."""
+    st.session_state[NEW_CHAT] = None
+
+
+def _has_tool_events(events: list[StreamEvent]) -> bool:
+    """Check if there are any tool-related events in the event list.
+
+    Args:
+        events (list[StreamEvent]): List of stream events.
+
+    Returns:
+        bool: True if there are tool_call or tool_output events, False otherwise.
+    """
+    return any(event.type in ("tool_call", "tool_output") for event in events)
+
+
+def _display_code_block(
+    code_block: str,
+    max_lines: int=10,
+    max_height: int=256,
+    container: DeltaGenerator | None = None
+):
+    """Display a code block in Streamlit with adaptive height.
+
+    If the code block has more lines than `max_lines`, the display height
+    is capped at `max_height`. Otherwise, the height is set to "content",
+    letting Streamlit adjust dynamically.
+
+    Args:
+        code_block (str): The code content to display.
+        max_lines (int, optional): Threshold for the maximum number of lines
+            before capping the height. Defaults to 10.
+        max_height (int, optional): Maximum height in pixels for code blocks
+            exceeding `max_lines`. Defaults to 256.
+        container (DeltaGenerator | None, optional): Streamlit container
+            to render into. If None, uses st directly. Defaults to None.
+    """
+    ctx = container if container is not None else st
+
+    n_lines = code_block.count("\n") + 1
+
+    if n_lines > max_lines:
+        height = max_height
+    else:
+        height = "content"
+
+    ctx.code(code_block, height=height)
+
+
+def _format_tool_args(args: dict[str, Any]) -> str:
+    """Format tool call arguments for display.
+
+    Expands sql queries arguments into multiline blocks for readability.
+    Otherwise pretty-prints the arguments as JSON.
+
+    Args:
+        args (dict[str, Any]): Tool call arguments.
+
+    Returns:
+        str: A JSON-like string representation of the arguments.
+    """
+    sql_query: str = args.get("sql_query", "")
+
+    if not sql_query:
+        return json.dumps(args, indent=2, ensure_ascii=False)
+
+    sql_query = sqlparse.format(
+        sql_query.strip(),
+        reindent=True,
+        keyword_case="upper"
+    )
+
+    sql_block = f'  "sql_query": `\n{sql_query}\n`'
+
+    return "{\n" + sql_block + "\n}"
+
+
+def _format_tool_outputs(results: str) -> str:
+    """Pretty-print tool call outputs.
+
+    Args:
+        results (str): Tool call results as a JSON string.
+
+    Returns:
+        str: Formatted JSON string.
+    """
+    return json.dumps(
+        json.loads(results),
+        ensure_ascii=False,
+        indent=2
+    )
+
+
+def _display_tool_event(event: StreamEvent, container: DeltaGenerator | None = None):
+    """Render a tool-related event in the Streamlit UI.
+
+    Displays messages, tool call arguments, and tool outputs
+    with appropriate formatting and code block sizing.
+
+    Args:
+        event (StreamEvent): The tool event to display.
+        container (DeltaGenerator | None, optional): Streamlit container
+            to render into. If None, uses st directly. Defaults to None.
+    """
+    ctx = container if container is not None else st
+
+    if event.type == "tool_call":
+        if event.data.content:
+            ctx.markdown(event.data.content)
+        for tool_call in event.data.tool_calls:
+            ctx.markdown(f"**Executando ferramenta** `{tool_call.name}`")
+            tool_args = _format_tool_args(tool_call.args)
+            _display_code_block(f"Solicitação:\n{tool_args}", container=ctx)
+    elif event.type == "tool_output":
+        for tool_output in event.data.tool_outputs:
+            if tool_output.status == "error":
+                ctx.markdown(f"Erro na execução da ferramenta `{tool_output.tool_name}`")
+            else:
+                if tool_output.metadata and tool_output.metadata.get("truncated"):
+                    ctx.info("Resposta muito extensa. Exibindo resultados parciais.", icon=":material/info:")
+                tool_outputs = _format_tool_outputs(tool_output.output)
+                _display_code_block(f"Resposta:\n{tool_outputs}", container=ctx)

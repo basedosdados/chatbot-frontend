@@ -1,6 +1,5 @@
 import streamlit as st
 
-
 _three_waving_dots_animation = """
     <style>
         .progress {
@@ -11,7 +10,7 @@ _three_waving_dots_animation = """
         .progress > div {
             width: 7px;
             height: 7px;
-            background-color: #fafafa;
+            background-color: #7c7f84;
             border-radius: 100%;
             display: inline-block;
             animation: wave 1.4s infinite ease-in-out both;
@@ -57,7 +56,7 @@ _three_pulsing_dots_animation = """
         .progress > div {
             width: 7px;
             height: 7px;
-            background-color: #fafafa;
+            background-color: #7c7f84;
             border-radius: 100%;
             display: inline-block;
             animation: pulse 1.4s infinite ease-in-out both;

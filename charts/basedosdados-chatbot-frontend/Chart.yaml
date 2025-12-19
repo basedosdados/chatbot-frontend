@@ -1,0 +1,11 @@
+apiVersion: v2
+name: basedosdados-chatbot-frontend
+description: Deploys the basedosdados chatbot frontend.
+
+type: application
+
+# This is the version of the chart
+version: 0.1.0
+
+# This is the version of the frontend package
+appVersion: "0.1.0"
