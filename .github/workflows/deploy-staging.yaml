@@ -1,0 +1,108 @@
+name: Deploy Staging Docker Container
+
+on:
+  workflow_run:
+    workflows:
+      - "Release Staging Docker Image"
+    branches:
+      - staging
+    types:
+      - completed
+  workflow_dispatch:
+
+jobs:
+  deploy-staging:
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.basedosdados.org
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: staging
+
+      - name: Import Secrets
+        id: import_secrets
+        uses: hashicorp/vault-action@v3
+        with:
+          url: https://vault.basedosdados.org
+          token: ${{ secrets.VAULT_TOKEN }}
+          secrets: |
+            secret/data/gcp_credentials/basedosdados-dev GCP_SA_KEY_BASE64 | GCP_SA_KEY_BASE64;
+            secret/data/gcp_credentials/basedosdados-dev GCP_PROJECT_ID    | GCP_PROJECT_ID;
+            secret/data/gcp_credentials/basedosdados-dev GKE_CLUSTER_NAME  | GKE_CLUSTER_NAME;
+            secret/data/gcp_credentials/basedosdados-dev GKE_CLUSTER_ZONE  | GKE_CLUSTER_ZONE;
+
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v0.2.1
+        with:
+          service_account_key: ${{ steps.import_secrets.outputs.GCP_SA_KEY_BASE64 }}
+          project_id: ${{ steps.import_secrets.outputs.GCP_PROJECT_ID }}
+          export_default_credentials: true
+
+      - name: Get GKE credentials
+        uses: google-github-actions/get-gke-credentials@v0.2.1
+        with:
+          cluster_name: ${{ steps.import_secrets.outputs.GKE_CLUSTER_NAME }}
+          location: ${{ steps.import_secrets.outputs.GKE_CLUSTER_ZONE }}
+          credentials: ${{ steps.import_secrets.outputs.GCP_SA_KEY_BASE64 }}
+
+      - name: Write values.yaml file
+        run: |
+          cat << 'EOF' > values.yaml
+          chatbotFrontend:
+            name: basedosdados-chatbot-frontend-staging
+            image:
+              name: ghcr.io/${{ github.repository }}
+              tag: staging
+              pullPolicy: Always
+            env:
+              API_HOST: api-staging-service
+              API_PORT: 80
+              LOG_LEVEL: INFO
+              LOG_BACKTRACE: true
+              LOG_DIAGNOSE: false
+              LOG_ENQUEUE: true
+            replicas: 1
+            resources:
+              requests:
+                cpu: 250m
+                memory: 500Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+            ingress:
+              enabled: true
+              host: staging.basedosdados.org
+              annotations:
+                nginx.ingress.kubernetes.io/use-regex: "true"
+                nginx.ingress.kubernetes.io/rewrite-target: /$2
+                nginx.ingress.kubernetes.io/ssl-redirect: "true"
+                cert-manager.io/issuer: letsencrypt-production
+                nginx.ingress.kubernetes.io/configuration-snippet: |
+                  # Redirect exact /chatbot-streamlit → /chatbot-streamlit/ with a 301
+                  rewrite ^/chatbot-streamlit$ /chatbot-streamlit/ permanent;
+              tls:
+                - hosts:
+                    - staging.basedosdados.org
+                  secretName: staging-basedosdados-org-tls
+          EOF
+
+      - name: Validate values.yaml file
+        run: |
+          echo "Generated values.yaml content:"
+          cat values.yaml
+          echo "Validating YAML syntax:"
+          python3 -c "import yaml; yaml.safe_load(open('values.yaml'))"
+
+      - name: Deploy using Helm
+        run: |
+          helm upgrade \
+          --install basedosdados-chatbot-frontend-staging charts/basedosdados-chatbot-frontend/. \
+          --namespace website \
+          --values values.yaml \
+          --debug \
+          --wait
