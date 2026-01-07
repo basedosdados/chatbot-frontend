@@ -7,10 +7,11 @@ import streamlit as st
 from loguru import logger
 from streamlit.delta_generator import DeltaGenerator
 from streamlit_extras.stylable_container import stylable_container
+from pydantic import UUID4
 
 from frontend.api import APIClient
 from frontend.components import *
-from frontend.datatypes import MessagePair, StreamEvent
+from frontend.datatypes import Message, MessageRole, MessageStatus, StreamEvent
 from frontend.exceptions import SessionExpiredException
 from frontend.utils.constants import NEW_CHAT
 from frontend.utils.logos import BD_LOGO
@@ -58,12 +59,12 @@ class ChatPage:
         except SessionExpiredException:
             _show_session_expired_dialog()
 
-    def _handle_send_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
+    def _handle_send_feedback(self, feedback_id: str, message_id: UUID4):
         """Handle feedback sending.
 
         Args:
             feedback_id (str): The feedback button identifier.
-            message_pair_id (uuid.UUID): The message pair identifier.
+            message_id (UUID4): The message pair identifier.
         """
         def reset_feedback_state():
             page_feedbacks: dict = st.session_state[self.page_id][self.feedbacks_key]
@@ -104,9 +105,9 @@ class ChatPage:
                         if self.api.send_feedback(
                             access_token=access_token,
                             refresh_token=refresh_token,
-                            message_pair_id=message_pair_id,
+                            message_id=message_id,
                             rating=feedback,
-                            comments=comments
+                            comments=comments,
                         ):
                             page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
                             page_feedbacks[feedback_id] = feedback
@@ -123,12 +124,12 @@ class ChatPage:
 
         show_feedback_popup()
 
-    def _handle_click_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
+    def _handle_click_feedback(self, feedback_id: str, message_id: UUID4):
         """Handle feedback buttons click and open the feedback dialog.
 
         Args:
             feedback_id (str): The feedback button identifier.
-            message_pair_id (uuid.UUID): The message pair identifier.
+            message_id (UUID4): The message pair identifier.
         """
         feedback = st.session_state[feedback_id]
 
@@ -142,26 +143,27 @@ class ChatPage:
 
         # Finally, set the feedback clicked flag and open the feedback dialog
         st.session_state[self.page_id][self.feedback_clicked_key] = True
-        self._handle_send_feedback(feedback_id, message_pair_id)
+        self._handle_send_feedback(feedback_id, message_id)
 
-    def _render_message_buttons(self, message_pair: MessagePair):
+    def _render_message_buttons(self, message: Message):
         """Render the feedback buttons on assistant's messages.
 
         Args:
-            message_pair (MessagePair):
-                A MessagePair object containing:
+            message (Message):
+                A Message object containing:
                     - id: unique identifier.
-                    - user_message: user message.
-                    - assistant_message: assistant message.
-                    - error_message: error message.
+                    - role: user or assistant
+                    - content: message content.
+                    - artifacts: list of message artifacts.
                     - events: list of streamed events.
+                    - status: message status.
         """
         # Checks if the model is still answering the question.
         # If so, all message buttons are disabled
         waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
 
         # Unique identifier for the feedback buttons widget
-        feedback_id = f"feedback_{message_pair.id}"
+        feedback_id = f"feedback_{message.id}"
 
         # Look for the feedback buttons widget in the session state
         page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
@@ -180,7 +182,7 @@ class ChatPage:
             "thumbs",
             key=feedback_id,
             on_change=self._handle_click_feedback,
-            args=(feedback_id, message_pair.id),
+            args=(feedback_id, message.id),
             disabled=waiting_for_answer
         )
 
@@ -272,7 +274,7 @@ class ChatPage:
         if self.chat_history_key not in page_session_state:
             if self.thread_id is not None:
                 try:
-                    message_pairs = self.api.get_message_pairs(
+                    messages = self.api.get_messages(
                         access_token=st.session_state["access_token"],
                         refresh_token=st.session_state["refresh_token"],
                         thread_id=self.thread_id
@@ -281,10 +283,10 @@ class ChatPage:
                     _show_session_expired_dialog()
                     return
             else:
-                message_pairs = []
-            page_session_state[self.chat_history_key] = message_pairs or []
+                messages = []
+            page_session_state[self.chat_history_key] = messages or []
 
-        chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
+        chat_history: list[Message] = page_session_state[self.chat_history_key]
 
         # Display the subheader message only if the chat history is empty
         if not chat_history:
@@ -294,29 +296,31 @@ class ChatPage:
         user_avatar = st.session_state.get("user_avatar")
 
         # Display chat messages from history on app rerun
-        for message_pair in chat_history:
-            with st.chat_message("user", avatar=user_avatar):
-                st.write(message_pair.user_message)
+        for message in chat_history:
+            if message.role == MessageRole.USER:
+                with st.chat_message("user", avatar=user_avatar):
+                    st.write(message.content)
 
-            with st.chat_message("assistant", avatar=BD_LOGO):
-                st.empty()
+            elif message.role == MessageRole.ASSISTANT:
+                with st.chat_message("assistant", avatar=BD_LOGO):
+                    st.empty()
 
-                if _has_tool_events(message_pair.events):
-                    if message_pair.assistant_message is not None:
-                        label, state = "Concluído! Clique para ver os detalhes", "complete"
+                    if _has_tool_events(message.events):
+                        if message.content is not None:
+                            label, state = "Concluído! Clique para ver os detalhes", "complete"
+                        else:
+                            label, state = "Erro", "error"
+
+                        with st.status(label=label, state=state):
+                            for event in message.events:
+                                _display_tool_event(event)
+
+                    if message.status == MessageStatus.SUCCESS:
+                        st.write(message.formatted_content)
                     else:
-                        label, state = "Erro", "error"
+                        st.error(message.content)
 
-                    with st.status(label=label, state=state):
-                        for event in message_pair.events:
-                            _display_tool_event(event)
-
-                if message_pair.assistant_message is not None:
-                    st.write(message_pair.formatted_assistant_message)
-                else:
-                    st.error(message_pair.error_message)
-
-                self._render_message_buttons(message_pair)
+                    self._render_message_buttons(message)
 
         # Accept user input
         if user_prompt := st.chat_input(
@@ -342,8 +346,6 @@ class ChatPage:
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=BD_LOGO):
                 events = []
-                error_message = None
-                assistant_message = None
                 status_placeholder = st.empty()
 
                 status = status_placeholder.status("Pensando...")
@@ -358,20 +360,23 @@ class ChatPage:
                         events.append(event)
 
                         if event.type == "final_answer":
-                            assistant_message = event.data.content
+                            message_content = event.data.content
+                            message_status = MessageStatus.SUCCESS
                             label, state = "Concluído! Clique para ver os detalhes", "complete"
                         elif event.type == "error":
-                            error_message = event.data.error_details.get("message", "Erro")
+                            message_content = event.data.error_details.get("message", "Erro")
+                            message_status = MessageStatus.ERROR
                             label, state = "Erro", "error"
                         elif event.type == "complete":
-                            message_pair = MessagePair(
+                            message = Message(
                                 id=event.data.run_id,
-                                user_message=user_prompt,
-                                assistant_message=assistant_message,
-                                error_message=error_message,
-                                events=events
+                                role=MessageRole.ASSISTANT,
+                                content=message_content,
+                                artifacts=[],
+                                events=events,
+                                status=message_status,
                             )
-                            if _has_tool_events(message_pair.events):
+                            if _has_tool_events(message.events):
                                 status.update(label=label, state=state)
                             else:
                                 status_placeholder.empty()
@@ -379,21 +384,21 @@ class ChatPage:
                             status.update(label="Consultando a Base dos Dados...")
                             _display_tool_event(event, container=status)
 
-                    if message_pair.assistant_message is not None:
-                        st.write_stream(message_pair.stream_words)
+                    if message.status == MessageStatus.SUCCESS:
+                        st.write_stream(message.stream_words)
                     else:
-                        st.error(message_pair.error_message)
+                        st.error(message.content)
 
                     # Render buttons immediately to ensure a complete UI before the reload.
                     # NOTE: These specific buttons are discarded on the st.rerun() below,
                     # and then re-rendered from the chat history on the next pass.
-                    self._render_message_buttons(message_pair)
+                    self._render_message_buttons(message)
                 except SessionExpiredException:
                     _show_session_expired_dialog()
                     return
 
             # Add message pair to chat history
-            chat_history.append(message_pair)
+            chat_history.append(message)
 
         # Render the chat deletion button
         self._render_delete_button()
@@ -561,5 +566,5 @@ def _display_tool_event(event: StreamEvent, container: DeltaGenerator | None = N
             else:
                 if tool_output.metadata and tool_output.metadata.get("truncated"):
                     ctx.info("Resposta muito extensa. Exibindo resultados parciais.", icon=":material/info:")
-                tool_outputs = _format_tool_outputs(tool_output.output)
+                tool_outputs = _format_tool_outputs(tool_output.content)
                 _display_code_block(f"Resposta:\n{tool_outputs}", container=ctx)

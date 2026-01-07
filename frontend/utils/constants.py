@@ -4,10 +4,15 @@ import dotenv
 
 dotenv.load_dotenv()
 
-# API variables
-API_HOST = os.environ["API_HOST"]
-API_PORT = os.environ["API_PORT"]
-BASE_URL = f"http://{API_HOST}:{API_PORT}" # Base API URL
+# Website API variables
+WEBSITE_HOST = os.environ["WEBSITE_HOST"]
+WEBSITE_PORT = os.environ["WEBSITE_PORT"]
+BASE_WEBSITE_URL = f"http://{WEBSITE_HOST}:{WEBSITE_PORT}"
+
+# Chatbot API variables
+CHATBOT_HOST = os.environ["CHATBOT_HOST"]
+CHATBOT_PORT = os.environ["CHATBOT_PORT"]
+BASE_CHATBOT_URL = f"http://{CHATBOT_HOST}:{CHATBOT_PORT}"
 
 # Set log level
 LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG")

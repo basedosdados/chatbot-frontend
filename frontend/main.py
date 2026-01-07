@@ -8,8 +8,9 @@ from loguru import logger
 from frontend.api import APIClient
 from frontend.components.chat_page import ChatPage
 from frontend.exceptions import SessionExpiredException
-from frontend.utils.constants import (BASE_URL, LOG_BACKTRACE, LOG_DIAGNOSE,
-                                      LOG_ENQUEUE, LOG_LEVEL, NEW_CHAT)
+from frontend.utils.constants import (BASE_CHATBOT_URL, BASE_WEBSITE_URL,
+                                      LOG_BACKTRACE, LOG_DIAGNOSE, LOG_ENQUEUE,
+                                      LOG_LEVEL, NEW_CHAT)
 from frontend.utils.logos import BD_LOGO
 
 
@@ -48,7 +49,7 @@ st.set_page_config(
     page_icon=BD_LOGO
 )
 
-api = APIClient(BASE_URL)
+api = APIClient(BASE_WEBSITE_URL, BASE_CHATBOT_URL)
 
 def login():
     st.title("Entrar")
@@ -76,6 +77,8 @@ def login():
 
         try:
             threads = api.get_threads(access_token, refresh_token)
+
+            logger.info(f"{threads = }")
 
             if threads is not None:
                 st.session_state["chat_pages"] = [

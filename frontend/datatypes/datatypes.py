@@ -2,35 +2,45 @@ import time
 import uuid
 from collections.abc import Generator
 from datetime import datetime
-from typing import Any, Literal, Optional
+from enum import Enum
+from typing import Any, Literal
 
 from loguru import logger
-from pydantic import UUID4, BaseModel, Field, model_validator
+from pydantic import UUID4, BaseModel, ConfigDict, Field, JsonValue
 
 from frontend.utils import escape_currency
 
 
 class Thread(BaseModel):
     id: UUID4
-    account: int
+    user_id: int
     title: str
     created_at: datetime
+
 
 class UserMessage(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     content: str
+
 
 class ToolCall(BaseModel):
     id: str
     name: str
     args: dict[str, Any]
 
+
 class ToolOutput(BaseModel):
     status: Literal["error", "success"]
     tool_call_id: str
     tool_name: str
-    output: str
-    metadata: dict[str, Any] | None = None
+    content: str = Field(validation_alias="output")
+    artifact: JsonValue | None = None
+    metadata: JsonValue | None = None
+
+    model_config = ConfigDict(
+        validate_by_alias=True,
+        validate_by_name=True,
+    )
 
 EventType = Literal[
     "tool_call",
@@ -40,42 +50,47 @@ EventType = Literal[
     "complete",
 ]
 
+
 class EventData(BaseModel):
-    run_id: Optional[UUID4] = None
-    content: Optional[str] = None
-    tool_calls: Optional[list[ToolCall]] = None
-    tool_outputs: Optional[list[ToolOutput]] = None
-    error_details: Optional[dict[str, Any]] = None
+    run_id: UUID4 | None = None
+    content: str | None = None
+    tool_calls: list[ToolCall] | None = None
+    tool_outputs: list[ToolOutput] | None = None
+    error_details: dict[str, Any] | None = None
+
 
 class StreamEvent(BaseModel):
     type: EventType
     data: EventData
 
-class MessagePair(BaseModel):
-    id: UUID4 = Field(default_factory=uuid.uuid4)
-    user_message: str
-    assistant_message: str|None = Field(default=None)
-    error_message: str|None = Field(default=None)
-    events: list[StreamEvent]
 
-    @model_validator(mode="after")
-    def validate_exactly_one_response(self) -> "MessagePair":
-        if (self.assistant_message is not None) ^ (self.error_message is not None):
-            return self
-        raise ValueError(
-            "Only one and exactly one of 'assistant_message' "
-            "or 'error_message' fields must be provided"
-        )
+class MessageRole(str, Enum):
+    ASSISTANT = "ASSISTANT"
+    USER = "USER"
+
+
+class MessageStatus(str, Enum):
+    ERROR = "ERROR"
+    SUCCESS = "SUCCESS"
+
+
+class Message(BaseModel):
+    id: UUID4 = Field(default_factory=uuid.uuid4)
+    role: MessageRole
+    content: str
+    artifacts: list | None
+    events: list[StreamEvent] | None
+    status: MessageStatus
 
     @property
-    def formatted_assistant_message(self) -> str | None:
+    def formatted_content(self) -> str | None:
         """Assistant message with currency symbols escaped for markdown rendering."""
-        if self.assistant_message:
+        if self.content:
             try:
-                return escape_currency(self.assistant_message)
+                return escape_currency(self.content)
             except Exception:
                 logger.exception(f"Failed to escape currency symbols for message pair {self.id}:")
-        return self.assistant_message
+        return self.content
 
     def stream_characters(self) -> Generator[str]:
         """Streams the assistant message character by character.
@@ -83,8 +98,8 @@ class MessagePair(BaseModel):
         Yields:
             Generator[str].
         """
-        if self.assistant_message:
-            for character in self.formatted_assistant_message:
+        if self.content:
+            for character in self.formatted_content:
                 yield character
                 time.sleep(0.01)
 
@@ -94,7 +109,7 @@ class MessagePair(BaseModel):
         Yields:
             Generator[str].
         """
-        if self.assistant_message:
-            for word in filter(None, self.formatted_assistant_message.split(" ")):
+        if self.content:
+            for word in filter(None, self.formatted_content.split(" ")):
                 yield word + " "
                 time.sleep(0.02)
