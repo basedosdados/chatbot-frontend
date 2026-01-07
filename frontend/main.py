@@ -1,6 +1,4 @@
-import sys
 import time
-from functools import cache
 
 import streamlit as st
 from loguru import logger
@@ -8,48 +6,23 @@ from loguru import logger
 from frontend.api import APIClient
 from frontend.components.chat_page import ChatPage
 from frontend.exceptions import SessionExpiredException
-from frontend.utils.constants import (BASE_CHATBOT_URL, BASE_WEBSITE_URL,
-                                      LOG_BACKTRACE, LOG_DIAGNOSE, LOG_ENQUEUE,
-                                      LOG_LEVEL, NEW_CHAT)
+from frontend.settings import settings
+from frontend.utils.constants import NEW_CHAT_KEY
+from frontend.utils.logging import setup_logger
 from frontend.utils.logos import BD_LOGO
 
 
-@cache
-def _setup_logger():
-    # Remove default handler
-    logger.remove()
-
-    # Formatting function
-    def _format(record):
-        if "classname" in record["extra"]:
-            keyname = record["extra"]["classname"]
-        else:
-            keyname = record["name"]
-
-        return (
-            "<g>{time:YYYY-MM-DD HH:mm:ss.SSS}</> | "
-            "<lvl>{level:<8}</> | "
-            "<c>%s:{function}:{line}</> - {message}\n{exception}" % keyname
-        )
-
-    # Add handler to logger
-    logger.add(
-        sink=sys.stdout,
-        level=LOG_LEVEL,
-        format=_format,
-        backtrace=LOG_BACKTRACE,
-        diagnose=LOG_DIAGNOSE,
-        enqueue=LOG_ENQUEUE
-    )
-
-_setup_logger()
+setup_logger()
 
 st.set_page_config(
     page_title="Chatbot BD",
     page_icon=BD_LOGO
 )
 
-api = APIClient(BASE_WEBSITE_URL, BASE_CHATBOT_URL)
+api = APIClient(
+    settings.BASE_WEBSITE_URL,
+    settings.BASE_CHATBOT_URL
+)
 
 def login():
     st.title("Entrar")
@@ -152,11 +125,11 @@ if st.session_state.get("logged_in"):
     about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
     logout_page = st.Page(page=logout, title="Sair", icon=":material/logout:")
 
-    if not st.session_state.get(NEW_CHAT):
+    if not st.session_state.get(NEW_CHAT_KEY):
         new_chat = ChatPage(api)
-        st.session_state[NEW_CHAT] = new_chat
+        st.session_state[NEW_CHAT_KEY] = new_chat
     else:
-        new_chat = st.session_state[NEW_CHAT]
+        new_chat = st.session_state[NEW_CHAT_KEY]
 
     new_chat_page = st.Page(
         page=new_chat.render, title="Nova conversa", icon=":material/add:", default=True

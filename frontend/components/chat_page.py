@@ -5,15 +5,15 @@ from typing import Any
 import sqlparse
 import streamlit as st
 from loguru import logger
+from pydantic import UUID4
 from streamlit.delta_generator import DeltaGenerator
 from streamlit_extras.stylable_container import stylable_container
-from pydantic import UUID4
 
 from frontend.api import APIClient
 from frontend.components import *
 from frontend.datatypes import Message, MessageRole, MessageStatus, StreamEvent
 from frontend.exceptions import SessionExpiredException
-from frontend.utils.constants import NEW_CHAT
+from frontend.utils.constants import NEW_CHAT_KEY
 from frontend.utils.logos import BD_LOGO
 
 
@@ -409,7 +409,7 @@ class ChatPage:
         if page_session_state[self.waiting_key]:
             page_session_state[self.waiting_key] = False
 
-            new_chat: ChatPage | None = st.session_state[NEW_CHAT]
+            new_chat: ChatPage | None = st.session_state[NEW_CHAT_KEY]
 
             # If this page is a new chat page, switch to it
             if new_chat and new_chat.page_id == self.page_id:
@@ -447,7 +447,7 @@ def _show_session_expired_dialog():
 
 def _clear_new_chat_page():
     """Clear new chat page on session state."""
-    st.session_state[NEW_CHAT] = None
+    st.session_state[NEW_CHAT_KEY] = None
 
 
 def _has_tool_events(events: list[StreamEvent]) -> bool:
