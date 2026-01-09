@@ -6,7 +6,8 @@ from enum import Enum
 from typing import Any, Literal
 
 from loguru import logger
-from pydantic import UUID4, BaseModel, ConfigDict, Field, JsonValue
+from pydantic import (UUID4, BaseModel, ConfigDict, Field, JsonValue,
+                      field_validator)
 
 from frontend.utils import escape_currency
 
@@ -78,9 +79,14 @@ class Message(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
     role: MessageRole
     content: str
-    artifacts: list | None
-    events: list[StreamEvent] | None
+    artifacts: list = Field(default_factory=list)
+    events: list[StreamEvent] = Field(default_factory=list)
     status: MessageStatus
+
+    @field_validator("artifacts", "events", mode="before")
+    @classmethod
+    def ensure_list(cls, value: list | None) -> list:
+        return value if value is not None else []
 
     @property
     def formatted_content(self) -> str | None:

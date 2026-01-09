@@ -11,7 +11,6 @@ from frontend.utils.constants import NEW_CHAT_KEY
 from frontend.utils.logging import setup_logger
 from frontend.utils.logos import BD_LOGO
 
-
 setup_logger()
 
 st.set_page_config(
