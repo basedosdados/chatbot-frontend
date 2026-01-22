@@ -50,8 +50,6 @@ def login():
         try:
             threads = api.get_threads(access_token, refresh_token)
 
-            logger.info(f"{threads = }")
-
             if threads is not None:
                 st.session_state["chat_pages"] = [
                     ChatPage(api, title=thread.title, thread_id=str(thread.id))
