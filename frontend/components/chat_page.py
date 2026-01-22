@@ -331,9 +331,17 @@ class ChatPage:
             # Clear subheader message
             subheader.empty()
 
+            user_message = Message(
+                role=MessageRole.USER,
+                content=user_prompt,
+                status=MessageStatus.SUCCESS,
+            )
+
+            chat_history.append(user_message)
+
             # Display user message in chat message container
             with st.chat_message("user", avatar=user_avatar):
-                st.write(user_prompt)
+                st.write(user_message.content)
 
             # Create thread only in the first message
             if (
