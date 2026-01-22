@@ -60,12 +60,10 @@ jobs:
               tag: prod
               pullPolicy: Always
             env:
-              API_HOST: api-prod-service
-              API_PORT: 80
-              LOG_LEVEL: INFO
-              LOG_BACKTRACE: true
-              LOG_DIAGNOSE: false
-              LOG_ENQUEUE: true
+              WEBSITE_HOST: api-prod-service
+              WEBSITE_PORT: 80
+              CHATBOT_HOST: chatbot-api-prod-service
+              CHATBOT_PORT: 80
             replicas: 1
             resources:
               requests:
