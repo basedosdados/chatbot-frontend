@@ -144,7 +144,7 @@ class APIClient:
 
         try:
             response = httpx.post(
-                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads",
                 json={"title": title},
                 headers=self._get_headers(access_token, refresh_token),
             )
@@ -171,11 +171,10 @@ class APIClient:
         self.logger.info("[THREAD] Retrieving threads")
         try:
             response = httpx.get(
-                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads",
                 params={"order_by": "created_at"},
                 headers=self._get_headers(access_token, refresh_token)
             )
-            self.logger.info(f"{response.json() = }")
             response.raise_for_status()
             threads = [Thread(**thread) for thread in response.json()]
             self.logger.success(f"[THREAD] Threads retrieved successfully")
@@ -200,7 +199,7 @@ class APIClient:
         self.logger.info(f"[MESSAGE] Retrieving messages for thread {thread_id}")
         try:
             response = httpx.get(
-                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}/messages/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}/messages",
                 params={"order_by": "created_at"},
                 headers=self._get_headers(access_token, refresh_token)
             )
@@ -236,7 +235,7 @@ class APIClient:
         try:
             with httpx.stream(
                 method="POST",
-                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}/messages/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}/messages",
                 headers=self._get_headers(access_token, refresh_token),
                 json=user_message.model_dump(mode="json"),
                 timeout=httpx.Timeout(5.0, read=300.0),
@@ -307,7 +306,7 @@ class APIClient:
 
         try:
             response = httpx.put(
-                url=f"{self.base_chatbot_url}/api/v1/chatbot/messages/{message_id}/feedbacks/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/messages/{message_id}/feedbacks",
                 json={"rating": rating, "comments": comments},
                 headers=self._get_headers(access_token, refresh_token)
             )
@@ -335,7 +334,7 @@ class APIClient:
 
         try:
             response = httpx.delete(
-                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}",
                 headers=self._get_headers(access_token, refresh_token),
                 timeout=httpx.Timeout(5.0, read=60.0)
             )
