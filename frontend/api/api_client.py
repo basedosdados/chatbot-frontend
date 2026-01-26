@@ -306,7 +306,7 @@ class APIClient:
 
         try:
             response = httpx.put(
-                url=f"{self.base_chatbot_url}/api/v1/chatbot/messages/{message_id}/feedbacks",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/messages/{message_id}/feedback",
                 json={"rating": rating, "comments": comments},
                 headers=self._get_headers(access_token, refresh_token)
             )
