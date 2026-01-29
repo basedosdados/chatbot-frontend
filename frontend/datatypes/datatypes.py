@@ -1,3 +1,4 @@
+import re
 import time
 import uuid
 from collections.abc import Generator
@@ -8,8 +9,6 @@ from typing import Any, Literal
 from loguru import logger
 from pydantic import (UUID4, BaseModel, ConfigDict, Field, JsonValue,
                       field_validator)
-
-from frontend.utils import escape_currency
 
 
 class Thread(BaseModel):
@@ -93,10 +92,33 @@ class Message(BaseModel):
         """Assistant message with currency symbols escaped for markdown rendering."""
         if self.content:
             try:
-                return escape_currency(self.content)
+                return self._escape_currency(self.content)
             except Exception:
                 logger.exception(f"Failed to escape currency symbols for message pair {self.id}:")
         return self.content
+
+    def _escape_currency(self, text: str):
+        """Escape currency dollar signs ($) while preserving markdown math expressions.
+
+        Args:
+            text (str): Input text.
+
+        Returns:
+            str: Text with currency dollar signs escaped.
+        """
+        # Regex to match math blocks ($$...$$), inline math ($...$), or single dollars ($)
+        # Inline math must not contain white spaces at the beginning/end of the expression
+        pattern = r'(\$\$[\s\S]*?\$\$)|(\$(?!\$)(?!\s)[^\$\n]*?[^\$\s]\$)|(\$)'
+
+        def repl(match: re.Match):
+            if match.group(1):
+                return match.group(1)
+            elif match.group(2):
+                return match.group(2)
+            else:
+                return r'\$'
+
+        return re.sub(pattern, repl, text)
 
     def stream_characters(self) -> Generator[str]:
         """Streams the assistant message character by character.
