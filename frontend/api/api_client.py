@@ -1,20 +1,22 @@
+import uuid
 from datetime import datetime, timedelta
 from typing import Iterator
-from uuid import UUID, uuid4
 
 import httpx
 import jwt
 import streamlit as st
 from loguru import logger
+from pydantic import UUID4
 
-from frontend.datatypes import (EventData, MessagePair, StreamEvent, Thread,
+from frontend.datatypes import (EventData, Message, StreamEvent, Thread,
                                 UserMessage)
 from frontend.exceptions import SessionExpiredException
 
 
 class APIClient:
-    def __init__(self, base_url: str):
-        self.base_url = base_url
+    def __init__(self, base_website_url: str, base_chatbot_url: str):
+        self.base_website_url = base_website_url
+        self.base_chatbot_url = base_chatbot_url
         self.logger = logger.bind(classname=self.__class__.__name__)
 
     def _is_token_expired(self, token: str) -> bool:
@@ -49,7 +51,7 @@ class APIClient:
             str: A refreshed access token.
         """
         response = httpx.post(
-            f"{self.base_url}/chatbot/token/refresh/",
+            f"{self.base_website_url}/chatbot/token/refresh/",
             json={"refresh": refresh_token}
         )
         response.raise_for_status()
@@ -100,7 +102,7 @@ class APIClient:
 
         try:
             response = httpx.post(
-                url=f"{self.base_url}/chatbot/token/",
+                url=f"{self.base_website_url}/chatbot/token/",
                 data={
                     "email": email,
                     "password": password
@@ -142,13 +144,13 @@ class APIClient:
 
         try:
             response = httpx.post(
-                url=f"{self.base_url}/chatbot/threads/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads",
                 json={"title": title},
                 headers=self._get_headers(access_token, refresh_token),
             )
             response.raise_for_status()
             thread = Thread(**response.json())
-            self.logger.success(f"[THREAD] Thread created successfully for user {thread.account}")
+            self.logger.success(f"[THREAD] Thread created successfully for user {thread.user_id}")
             return thread
         except SessionExpiredException:
             raise
@@ -169,7 +171,7 @@ class APIClient:
         self.logger.info("[THREAD] Retrieving threads")
         try:
             response = httpx.get(
-                url=f"{self.base_url}/chatbot/threads/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads",
                 params={"order_by": "created_at"},
                 headers=self._get_headers(access_token, refresh_token)
             )
@@ -183,42 +185,42 @@ class APIClient:
             self.logger.exception(f"[THREAD] Error on threads retrieval:")
             return None
 
-    def get_message_pairs(self, access_token: str, refresh_token: str, thread_id: UUID) -> list[MessagePair]|None:
+    def get_messages(self, access_token: str, refresh_token: str, thread_id: UUID4) -> list[Message]|None:
         """Get all messages from a thread.
 
         Args:
             access_token (str): User access token.
             refresh_token (str): User refresh token.
-            thread_id (UUID): Thread unique identifier.
+            thread_id (UUID4): Thread unique identifier.
 
         Returns:
-            list[MessagePair]|None: A list of MessagePair objects if any message was found. None otherwise.
+            list[Message]|None: A list of Message objects if any message was found. None otherwise.
         """
-        self.logger.info(f"[MESSAGE] Retrieving message pairs for thread {thread_id}")
+        self.logger.info(f"[MESSAGE] Retrieving messages for thread {thread_id}")
         try:
             response = httpx.get(
-                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}/messages",
                 params={"order_by": "created_at"},
                 headers=self._get_headers(access_token, refresh_token)
             )
             response.raise_for_status()
-            message_pairs = [MessagePair(**pair) for pair in response.json()]
-            self.logger.success(f"[MESSAGE] Message pairs retrieved successfully for thread {thread_id}")
-            return message_pairs
+            messages = [Message(**msg) for msg in response.json()]
+            self.logger.success(f"[MESSAGE] Messages retrieved successfully for thread {thread_id}")
+            return messages
         except SessionExpiredException:
             raise
         except Exception:
-            self.logger.exception(f"[MESSAGE] Error on message pairs retrieval for thread {thread_id}:")
+            self.logger.exception(f"[MESSAGE] Error on messages retrieval for thread {thread_id}:")
             return None
 
-    def send_message(self, access_token: str, refresh_token: str, message: str, thread_id: UUID) -> Iterator[StreamEvent]:
+    def send_message(self, access_token: str, refresh_token: str, message: str, thread_id: UUID4) -> Iterator[StreamEvent]:
         """Send a user message and stream the assistant's response.
 
         Args:
             access_token (str): User access token.
             refresh_token (str): User refresh token.
             message (str): The message sent by the user.
-            thread_id (UUID):Thread unique identifier.
+            thread_id (UUID4):Thread unique identifier.
 
         Yields:
             Iterator[StreamEvent]: Iterator of `StreamEvent` objects.
@@ -233,7 +235,7 @@ class APIClient:
         try:
             with httpx.stream(
                 method="POST",
-                url=f"{self.base_url}/chatbot/threads/{thread_id}/messages/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}/messages",
                 headers=self._get_headers(access_token, refresh_token),
                 json=user_message.model_dump(mode="json"),
                 timeout=httpx.Timeout(5.0, read=300.0),
@@ -284,28 +286,28 @@ class APIClient:
 
             yield StreamEvent(
                 type="complete",
-                data=EventData(run_id=uuid4())
+                data=EventData(run_id=uuid.uuid4())
             )
 
-    def send_feedback(self, access_token: str, refresh_token: str, message_pair_id: UUID, rating: int, comments: str) -> bool:
+    def send_feedback(self, access_token: str, refresh_token: str, message_id: UUID4, rating: int, comments: str) -> bool:
         """Send a feedback.
 
         Args:
             access_token (str): User access token.
             refresh_token (str): User refresh token.
-            message_pair_id (UUID): The message pair unique identifier.
+            message_id (UUID4): The message unique identifier.
             rating (int): The rating (0 or 1).
             comments (str): The comments.
 
         Returns:
             bool: Whether the operation succeeded or not.
         """
-        self.logger.info(f"[FEEDBACK] Sending feedback ({rating}) for message pair {message_pair_id}")
+        self.logger.info(f"[FEEDBACK] Sending feedback ({rating}) for message pair {message_id}")
 
         try:
             response = httpx.put(
-                url=f"{self.base_url}/chatbot/message-pairs/{message_pair_id}/feedbacks/",
-                json={"rating": rating, "comment": comments},
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/messages/{message_id}/feedback",
+                json={"rating": rating, "comments": comments},
                 headers=self._get_headers(access_token, refresh_token)
             )
             response.raise_for_status()
@@ -317,13 +319,13 @@ class APIClient:
             self.logger.exception(f"[FEEDBACK] Error on sending feedback:")
             return False
 
-    def delete_thread(self, access_token: str, refresh_token: str, thread_id: UUID) -> bool:
+    def delete_thread(self, access_token: str, refresh_token: str, thread_id: UUID4) -> bool:
         """Soft delete a thread and hard delete all its checkpoints.
 
         Args:
             access_token (str): User access token.
             refresh_token (str): User refresh token.
-            thread_id (UUID): Thread unique identifier.
+            thread_id (UUID4): Thread unique identifier.
 
         Returns:
             bool: Whether the operation succeeded or not.
@@ -332,7 +334,7 @@ class APIClient:
 
         try:
             response = httpx.delete(
-                url=f"{self.base_url}/chatbot/threads/{thread_id}/",
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/threads/{thread_id}",
                 headers=self._get_headers(access_token, refresh_token),
                 timeout=httpx.Timeout(5.0, read=60.0)
             )
