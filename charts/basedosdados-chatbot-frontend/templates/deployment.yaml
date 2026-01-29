@@ -34,6 +34,7 @@ spec:
           ports:
             - name: streamlit
               containerPort: 8501
+          {{- $env := .Values.chatbotFrontend.env }}
           env:
             - name: WEBSITE_HOST
               value: {{ required ".Values.chatbotFrontend.env.WEBSITE_HOST is required" $env.WEBSITE_HOST | quote }}
