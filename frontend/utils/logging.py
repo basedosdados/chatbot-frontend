@@ -31,5 +31,5 @@ def setup_logger():
         format=_format,
         backtrace=settings.LOG_BACKTRACE,
         diagnose=settings.LOG_DIAGNOSE,
-        enqueue=settings.LOG_ENQUEUE
+        enqueue=settings.LOG_ENQUEUE,
     )

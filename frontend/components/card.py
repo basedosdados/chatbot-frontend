@@ -102,10 +102,9 @@ _card = """
     </div>
 """
 
+
 def render_card(icon: str, text: str):
     components.html(
-        _card_style +
-        _card_functions +
-        _card.format(icon=icon, text=text),
+        _card_style + _card_functions + _card.format(icon=icon, text=text),
         height=175,
     )

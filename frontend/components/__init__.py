@@ -11,5 +11,5 @@ __all__ = [
     "code_button_container",
     "three_pulsing_dots",
     "three_waving_dots",
-    "typewrite"
+    "typewrite",
 ]
