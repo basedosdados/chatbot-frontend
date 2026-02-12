@@ -7,13 +7,12 @@ from enum import Enum
 from typing import Any, Literal
 
 from loguru import logger
-from pydantic import (UUID4, BaseModel, ConfigDict, Field, JsonValue,
-                      field_validator)
+from pydantic import UUID4, BaseModel, ConfigDict, Field, JsonValue, field_validator
 
 
 class Thread(BaseModel):
     id: UUID4
-    user_id: int
+    user_id: UUID4
     title: str
     created_at: datetime
 
@@ -41,6 +40,7 @@ class ToolOutput(BaseModel):
         validate_by_alias=True,
         validate_by_name=True,
     )
+
 
 EventType = Literal[
     "tool_call",
@@ -94,7 +94,9 @@ class Message(BaseModel):
             try:
                 return self._escape_currency(self.content)
             except Exception:
-                logger.exception(f"Failed to escape currency symbols for message pair {self.id}:")
+                logger.exception(
+                    f"Failed to escape currency symbols for message pair {self.id}:"
+                )
         return self.content
 
     def _escape_currency(self, text: str):
@@ -108,7 +110,7 @@ class Message(BaseModel):
         """
         # Regex to match math blocks ($$...$$), inline math ($...$), or single dollars ($)
         # Inline math must not contain white spaces at the beginning/end of the expression
-        pattern = r'(\$\$[\s\S]*?\$\$)|(\$(?!\$)(?!\s)[^\$\n]*?[^\$\s]\$)|(\$)'
+        pattern = r"(\$\$[\s\S]*?\$\$)|(\$(?!\$)(?!\s)[^\$\n]*?[^\$\s]\$)|(\$)"
 
         def repl(match: re.Match):
             if match.group(1):
@@ -116,7 +118,7 @@ class Message(BaseModel):
             elif match.group(2):
                 return match.group(2)
             else:
-                return r'\$'
+                return r"\$"
 
         return re.sub(pattern, repl, text)
 

@@ -1,7 +1,6 @@
 import time
 
 import streamlit as st
-from loguru import logger
 
 from frontend.api import APIClient
 from frontend.components.chat_page import ChatPage
@@ -13,22 +12,16 @@ from frontend.utils.logos import BD_LOGO
 
 setup_logger()
 
-st.set_page_config(
-    page_title="Chatbot BD",
-    page_icon=BD_LOGO
-)
+st.set_page_config(page_title="Chatbot BD", page_icon=BD_LOGO)
 
-api = APIClient(
-    settings.BASE_WEBSITE_URL,
-    settings.BASE_CHATBOT_URL
-)
+api = APIClient(settings.BASE_WEBSITE_URL, settings.BASE_CHATBOT_URL)
+
 
 def login():
     st.title("Entrar")
     st.caption("Por favor, insira seu e-mail e senha para continuar")
 
     access_token = None
-    refresh_token = None
     message = None
 
     with st.form("register_form"):
@@ -38,17 +31,18 @@ def login():
         col1, _ = st.columns(2)
 
         if col1.form_submit_button("Entrar", type="primary"):
-            access_token, refresh_token, message = api.authenticate(email, password)
+            access_token, message = api.authenticate(email, password)
 
-    if access_token and refresh_token:
+    if access_token:
         st.session_state["email"] = email
         st.session_state["logged_in"] = True
         st.session_state["access_token"] = access_token
-        st.session_state["refresh_token"] = refresh_token
-        st.session_state["user_avatar"] = f"https://api.dicebear.com/9.x/initials/svg?seed={email[0]}&backgroundColor=7ec876&radius=50"
+        st.session_state["user_avatar"] = (
+            f"https://api.dicebear.com/9.x/initials/svg?seed={email[0]}&backgroundColor=7ec876&radius=50"
+        )
 
         try:
-            threads = api.get_threads(access_token, refresh_token)
+            threads = api.get_threads(access_token)
 
             if threads is not None:
                 st.session_state["chat_pages"] = [
@@ -63,10 +57,14 @@ def login():
             st.rerun()
         except SessionExpiredException:
             st.session_state.clear()
-            st.error("Sessão expirada durante o login. Por favor, tente novamente.", icon=":material/error:")
+            st.error(
+                "Sessão expirada durante o login. Por favor, tente novamente.",
+                icon=":material/error:",
+            )
 
     elif message is not None:
         st.error(message, icon=":material/error:")
+
 
 def logout():
     st.title("Tem certeza que deseja sair?")
@@ -78,6 +76,7 @@ def logout():
         time.sleep(0.5)
         st.rerun()
 
+
 def about():
     st.title("Chatbot BD")
     st.caption("Para consultas em bases de dados utilizando linguagem natural")
@@ -85,7 +84,10 @@ def about():
     st.write("\n")
 
     st.subheader("Bem Vindo(a)! 👋")
-    st.write(f"Bem vindo(a) ao chatbot da BD! Ele vai te ajudar a conversar com seus dados! Basta entrar na página de chat no menu à esquerda e começar a conversa. Faça perguntas sobre os dados disponíveis e o chatbot dará o seu melhor para respondê-las!", unsafe_allow_html=True)
+    st.write(
+        "Bem vindo(a) ao chatbot da BD! Ele vai te ajudar a conversar com seus dados! Basta entrar na página de chat no menu à esquerda e começar a conversa. Faça perguntas sobre os dados disponíveis e o chatbot dará o seu melhor para respondê-las!",
+        unsafe_allow_html=True,
+    )
 
     st.write("\n")
 
@@ -99,27 +101,32 @@ def about():
     st.subheader("Funcionalidades 🛠️")
     st.write("""
         - **Feedback (:material/thumb_up: ou :material/thumb_down:):** Clique nos botões de feedback para avaliar as respostas, com comentários opcionais.
-        - **Excluir Conversa (:material/delete:):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. As mensagens permanecerão salvas em nosso banco de dados para análise e melhoria do produto."""
-    )
+        - **Excluir Conversa (:material/delete:):** Clique no botão de excluir conversa para excluir a conversa com o chatbot. As mensagens permanecerão salvas em nosso banco de dados para análise e melhoria do produto.""")
     st.write("\n")
 
     # Prompting guide
     st.subheader("Guia de Prompt 📋")
-    st.write("A forma como você conversa com o chatbot pode influenciar na qualidade das respostas! Por isso, abaixo estão listadas algumas dicas para te ajudar a elaborar suas perguntas. Elas podem ser úteis caso as respostas fornecidas estejam incorretas ou não sejam boas o suficiente!")
+    st.write(
+        "A forma como você conversa com o chatbot pode influenciar na qualidade das respostas! Por isso, abaixo estão listadas algumas dicas para te ajudar a elaborar suas perguntas. Elas podem ser úteis caso as respostas fornecidas estejam incorretas ou não sejam boas o suficiente!"
+    )
     st.write("""
         1. Tente fazer uma pergunta por vez. Caso sua pergunta seja muito complexa, ou talvez seja um conjunto de várias perguntas, tente separá-la em perguntas menores e mais simples.
         2. Tente utilizar termos como "**por**" ou "**total**" quando precisar de informações agregadas segundo alguma variável.
         3. Caso saiba os nomes das colunas das tabelas, tente mencioná-los nas suas perguntas. Por exemplo, se você sabe que uma tabela possui a coluna "**município**", tente usar a palavra **município** ao invés de "cidade". Isso não significa que você não possa usar palavras parecidas, mas usar os nomes das colunas ajuda!
-        4. Caso o chatbot não esteja encontrando uma resposta para a sua pergunta e você saiba em qual tabela estão os dados necessários para respondê-la, você pode tentar pedir explicitamente para procurar nessa tabela específica."""
-    )
+        4. Caso o chatbot não esteja encontrando uma resposta para a sua pergunta e você saiba em qual tabela estão os dados necessários para respondê-la, você pode tentar pedir explicitamente para procurar nessa tabela específica.""")
     st.write("\n")
 
     # Important information
     st.subheader("Importante 📌")
-    st.info("⏳ Depois de enviar uma pergunta ao chatbot, aguarde a resposta completa antes de trocar de página ou clicar em botões. Você pode alternar entre abas do navegador normalmente.")
+    st.info(
+        "⏳ Depois de enviar uma pergunta ao chatbot, aguarde a resposta completa antes de trocar de página ou clicar em botões. Você pode alternar entre abas do navegador normalmente."
+    )
+
 
 if st.session_state.get("logged_in"):
-    about_page = st.Page(page=about, title="Conheça o App", icon=":material/lightbulb_2:")
+    about_page = st.Page(
+        page=about, title="Conheça o App", icon=":material/lightbulb_2:"
+    )
     logout_page = st.Page(page=logout, title="Sair", icon=":material/logout:")
 
     if not st.session_state.get(NEW_CHAT_KEY):
@@ -138,8 +145,9 @@ if st.session_state.get("logged_in"):
         st.Page(
             page=chat_page.render,
             title=chat_page.title,
-            url_path=str(chat_page.thread_id)
-        ) for chat_page in reversed(chat_pages)
+            url_path=str(chat_page.thread_id),
+        )
+        for chat_page in reversed(chat_pages)
     ]
 
     sections = {
