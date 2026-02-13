@@ -85,7 +85,7 @@ class APIClient:
             access_token (str): The access token.
 
         Raises:
-            SessionExpiredException: If refresh token is expired (401).
+            SessionExpiredException: If refresh token is None.
 
         Returns:
             dict[str, str]: The authorization headers,
