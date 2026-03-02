@@ -20,5 +20,5 @@ def render_disclaimer():
                     Todas as informações aqui enviadas são registradas para análise e melhoria do produto.
                 </div>
             """,
-            unsafe_allow_html=True,
+            unsafe_allow_html=True
         )

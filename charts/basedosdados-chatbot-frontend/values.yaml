@@ -11,10 +11,12 @@ chatbotFrontend:
 
   # Environment variables
   env:
-    WEBSITE_HOST: basedosdados-api
-    WEBSITE_PORT: 8000
-    CHATBOT_PORT: chatbot-api
-    CHATBOT_PORT: 8000
+    API_HOST: localhost
+    API_PORT: 8000
+    LOG_LEVEL: DEBUG
+    LOG_BACKTRACE: true
+    LOG_DIAGNOSE: false
+    LOG_ENQUEUE: true
 
   # Number of replicas
   replicas: 1

@@ -1,18 +1,8 @@
-from .datatypes import (
-    EventData,
-    Message,
-    MessageRole,
-    MessageStatus,
-    StreamEvent,
-    Thread,
-    UserMessage,
-)
+from .datatypes import EventData, MessagePair, StreamEvent, Thread, UserMessage
 
 __all__ = [
     "EventData",
-    "Message",
-    "MessageRole",
-    "MessageStatus",
+    "MessagePair",
     "StreamEvent",
     "Thread",
     "UserMessage",

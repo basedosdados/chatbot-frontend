@@ -5,15 +5,14 @@ from typing import Any
 import sqlparse
 import streamlit as st
 from loguru import logger
-from pydantic import UUID4
 from streamlit.delta_generator import DeltaGenerator
 from streamlit_extras.stylable_container import stylable_container
 
 from frontend.api import APIClient
-from frontend.components import typewrite, render_disclaimer
-from frontend.datatypes import Message, MessageRole, MessageStatus, StreamEvent
+from frontend.components import *
+from frontend.datatypes import MessagePair, StreamEvent
 from frontend.exceptions import SessionExpiredException
-from frontend.utils.constants import NEW_CHAT_KEY
+from frontend.utils.constants import NEW_CHAT
 from frontend.utils.logos import BD_LOGO
 
 
@@ -24,9 +23,7 @@ class ChatPage:
     feedback_clicked_key = "feedback_clicked"
     waiting_key = "waiting_for_answer"
 
-    def __init__(
-        self, api: APIClient, title: str | None = None, thread_id: str | None = None
-    ):
+    def __init__(self, api: APIClient, title: str | None = None, thread_id: str | None = None):
         self.api = api
         self.title = title
         self.thread_id = thread_id
@@ -45,6 +42,7 @@ class ChatPage:
         try:
             thread = self.api.create_thread(
                 access_token=st.session_state["access_token"],
+                refresh_token=st.session_state["refresh_token"],
                 title=title,
             )
 
@@ -55,21 +53,18 @@ class ChatPage:
                 chat_pages.append(self)
                 return True
             else:
-                _show_error_popup(
-                    "Não foi possível criar a thread. Por favor, inicie uma nova conversa."
-                )
+                _show_error_popup("Não foi possível criar a thread. Por favor, inicie uma nova conversa.")
                 return False
         except SessionExpiredException:
             _show_session_expired_dialog()
 
-    def _handle_send_feedback(self, feedback_id: str, message_id: UUID4):
+    def _handle_send_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
         """Handle feedback sending.
 
         Args:
             feedback_id (str): The feedback button identifier.
-            message_id (UUID4): The message pair identifier.
+            message_pair_id (uuid.UUID): The message pair identifier.
         """
-
         def reset_feedback_state():
             page_feedbacks: dict = st.session_state[self.page_id][self.feedbacks_key]
             st.session_state[feedback_id] = page_feedbacks.get(feedback_id)
@@ -79,6 +74,7 @@ class ChatPage:
         def show_feedback_popup():
             feedback = st.session_state[feedback_id]
             access_token = st.session_state["access_token"]
+            refresh_token = st.session_state["refresh_token"]
 
             if feedback:
                 placeholder = "O que foi satisfatório na resposta?"
@@ -99,7 +95,7 @@ class ChatPage:
                     button {
                         white-space: nowrap;
                     }
-                """,
+                """
             ):
                 _, col1, col2 = st.columns([0.64, 0.18, 0.22])
 
@@ -107,28 +103,19 @@ class ChatPage:
                     try:
                         if self.api.send_feedback(
                             access_token=access_token,
-                            message_id=message_id,
+                            refresh_token=refresh_token,
+                            message_pair_id=message_pair_id,
                             rating=feedback,
-                            comments=comments,
+                            comments=comments
                         ):
-                            page_feedbacks = st.session_state[self.page_id][
-                                self.feedbacks_key
-                            ]
+                            page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
                             page_feedbacks[feedback_id] = feedback
-                            st.session_state[self.page_id][
-                                self.feedback_clicked_key
-                            ] = False
+                            st.session_state[self.page_id][self.feedback_clicked_key] = False
                             st.rerun()
                         else:
-                            error_placeholder.error(
-                                "Não foi possível enviar o feedback.",
-                                icon=":material/error:",
-                            )
+                            error_placeholder.error("Não foi possível enviar o feedback.", icon=":material/error:")
                     except SessionExpiredException:
-                        error_placeholder.warning(
-                            "Sua sessão expirou. Faça login novamente.",
-                            icon=":material/schedule:",
-                        )
+                        error_placeholder.warning("Sua sessão expirou. Faça login novamente.", icon=":material/schedule:")
 
                 if col2.button("Cancelar"):
                     reset_feedback_state()
@@ -136,12 +123,12 @@ class ChatPage:
 
         show_feedback_popup()
 
-    def _handle_click_feedback(self, feedback_id: str, message_id: UUID4):
+    def _handle_click_feedback(self, feedback_id: str, message_pair_id: uuid.UUID):
         """Handle feedback buttons click and open the feedback dialog.
 
         Args:
             feedback_id (str): The feedback button identifier.
-            message_id (UUID4): The message pair identifier.
+            message_pair_id (uuid.UUID): The message pair identifier.
         """
         feedback = st.session_state[feedback_id]
 
@@ -155,27 +142,26 @@ class ChatPage:
 
         # Finally, set the feedback clicked flag and open the feedback dialog
         st.session_state[self.page_id][self.feedback_clicked_key] = True
-        self._handle_send_feedback(feedback_id, message_id)
+        self._handle_send_feedback(feedback_id, message_pair_id)
 
-    def _render_message_buttons(self, message: Message):
+    def _render_message_buttons(self, message_pair: MessagePair):
         """Render the feedback buttons on assistant's messages.
 
         Args:
-            message (Message):
-                A Message object containing:
+            message_pair (MessagePair):
+                A MessagePair object containing:
                     - id: unique identifier.
-                    - role: user or assistant
-                    - content: message content.
-                    - artifacts: list of message artifacts.
+                    - user_message: user message.
+                    - assistant_message: assistant message.
+                    - error_message: error message.
                     - events: list of streamed events.
-                    - status: message status.
         """
         # Checks if the model is still answering the question.
         # If so, all message buttons are disabled
         waiting_for_answer = st.session_state[self.page_id][self.waiting_key]
 
         # Unique identifier for the feedback buttons widget
-        feedback_id = f"feedback_{message.id}"
+        feedback_id = f"feedback_{message_pair.id}"
 
         # Look for the feedback buttons widget in the session state
         page_feedbacks = st.session_state[self.page_id][self.feedbacks_key]
@@ -183,8 +169,8 @@ class ChatPage:
         # Restore previous feedback state if it already exists in the session
         # and no feedback was clicked in this run, to persist state across reruns
         if (
-            feedback_id in page_feedbacks
-            and not st.session_state[self.page_id][self.feedback_clicked_key]
+            feedback_id in page_feedbacks and
+            not st.session_state[self.page_id][self.feedback_clicked_key]
         ):
             last_feedback = page_feedbacks[feedback_id]
             st.session_state[feedback_id] = last_feedback
@@ -194,16 +180,15 @@ class ChatPage:
             "thumbs",
             key=feedback_id,
             on_change=self._handle_click_feedback,
-            args=(feedback_id, message.id),
-            disabled=waiting_for_answer,
+            args=(feedback_id, message_pair.id),
+            disabled=waiting_for_answer
         )
 
     def _render_delete_button(self):
         """Render the chat deletion button."""
-
         @st.dialog("Excluir conversa")
         def show_delete_chat_modal():
-            st.markdown("")  # just for spacing
+            st.markdown("") # just for spacing
             st.text("Tem certeza que deseja excluir esta conversa permanentemente?")
 
             warning_placeholder = st.empty()
@@ -217,14 +202,12 @@ class ChatPage:
                 try:
                     deleted = self.api.delete_thread(
                         access_token=st.session_state["access_token"],
-                        thread_id=self.thread_id,
+                        refresh_token=st.session_state["refresh_token"],
+                        thread_id=self.thread_id
                     )
 
                     if not deleted:
-                        st.error(
-                            "Não foi possível excluir a conversa.",
-                            icon=":material/error:",
-                        )
+                        st.error("Não foi possível excluir a conversa.", icon=":material/error:")
                         return
 
                     chat_pages: list[ChatPage] = st.session_state["chat_pages"]
@@ -236,10 +219,7 @@ class ChatPage:
 
                     st.rerun()
                 except SessionExpiredException:
-                    warning_placeholder.warning(
-                        "Sua sessão expirou. Faça login novamente.",
-                        icon=":material/schedule:",
-                    )
+                    warning_placeholder.warning("Sua sessão expirou. Faça login novamente.", icon=":material/schedule:")
 
         page_session_state = st.session_state[self.page_id]
         chat_delete_disabled = page_session_state[self.delete_btn_key]
@@ -292,18 +272,19 @@ class ChatPage:
         if self.chat_history_key not in page_session_state:
             if self.thread_id is not None:
                 try:
-                    messages = self.api.get_messages(
+                    message_pairs = self.api.get_message_pairs(
                         access_token=st.session_state["access_token"],
-                        thread_id=self.thread_id,
+                        refresh_token=st.session_state["refresh_token"],
+                        thread_id=self.thread_id
                     )
                 except SessionExpiredException:
                     _show_session_expired_dialog()
                     return
             else:
-                messages = []
-            page_session_state[self.chat_history_key] = messages or []
+                message_pairs = []
+            page_session_state[self.chat_history_key] = message_pairs or []
 
-        chat_history: list[Message] = page_session_state[self.chat_history_key]
+        chat_history: list[MessagePair] = page_session_state[self.chat_history_key]
 
         # Display the subheader message only if the chat history is empty
         if not chat_history:
@@ -313,59 +294,47 @@ class ChatPage:
         user_avatar = st.session_state.get("user_avatar")
 
         # Display chat messages from history on app rerun
-        for message in chat_history:
-            if message.role == MessageRole.USER:
-                with st.chat_message("user", avatar=user_avatar):
-                    st.write(message.content)
+        for message_pair in chat_history:
+            with st.chat_message("user", avatar=user_avatar):
+                st.write(message_pair.user_message)
 
-            elif message.role == MessageRole.ASSISTANT:
-                with st.chat_message("assistant", avatar=BD_LOGO):
-                    st.empty()
+            with st.chat_message("assistant", avatar=BD_LOGO):
+                st.empty()
 
-                    if _has_tool_events(message.events):
-                        if message.content is not None:
-                            label, state = (
-                                "Concluído! Clique para ver os detalhes",
-                                "complete",
-                            )
-                        else:
-                            label, state = "Erro", "error"
-
-                        with st.status(label=label, state=state):
-                            for event in message.events:
-                                _display_tool_event(event)
-
-                    if message.status == MessageStatus.SUCCESS:
-                        st.write(message.formatted_content)
+                if _has_tool_events(message_pair.events):
+                    if message_pair.assistant_message is not None:
+                        label, state = "Concluído! Clique para ver os detalhes", "complete"
                     else:
-                        st.error(message.content)
+                        label, state = "Erro", "error"
 
-                    self._render_message_buttons(message)
+                    with st.status(label=label, state=state):
+                        for event in message_pair.events:
+                            _display_tool_event(event)
+
+                if message_pair.assistant_message is not None:
+                    st.write(message_pair.formatted_assistant_message)
+                else:
+                    st.error(message_pair.error_message)
+
+                self._render_message_buttons(message_pair)
 
         # Accept user input
         if user_prompt := st.chat_input(
             "Faça uma pergunta!",
             on_submit=self._handle_user_interaction,
-            disabled=page_session_state[self.waiting_key],
+            disabled=page_session_state[self.waiting_key]
         ):
             # Clear subheader message
             subheader.empty()
 
-            user_message = Message(
-                role=MessageRole.USER,
-                content=user_prompt,
-                status=MessageStatus.SUCCESS,
-            )
-
-            chat_history.append(user_message)
-
             # Display user message in chat message container
             with st.chat_message("user", avatar=user_avatar):
-                st.write(user_message.content)
+                st.write(user_prompt)
 
             # Create thread only in the first message
-            if self.thread_id is None and not self._create_thread_and_register(
-                title=user_prompt
+            if (
+                self.thread_id is None and not
+                self._create_thread_and_register(title=user_prompt)
             ):
                 _clear_new_chat_page()
                 return
@@ -373,6 +342,8 @@ class ChatPage:
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=BD_LOGO):
                 events = []
+                error_message = None
+                assistant_message = None
                 status_placeholder = st.empty()
 
                 status = status_placeholder.status("Pensando...")
@@ -380,34 +351,27 @@ class ChatPage:
                 try:
                     for event in self.api.send_message(
                         access_token=st.session_state["access_token"],
+                        refresh_token=st.session_state["refresh_token"],
                         message=user_prompt,
-                        thread_id=self.thread_id,
+                        thread_id=self.thread_id
                     ):
                         events.append(event)
 
                         if event.type == "final_answer":
-                            message_content = event.data.content
-                            message_status = MessageStatus.SUCCESS
-                            label, state = (
-                                "Concluído! Clique para ver os detalhes",
-                                "complete",
-                            )
+                            assistant_message = event.data.content
+                            label, state = "Concluído! Clique para ver os detalhes", "complete"
                         elif event.type == "error":
-                            message_content = event.data.error_details.get(
-                                "message", "Erro"
-                            )
-                            message_status = MessageStatus.ERROR
+                            error_message = event.data.error_details.get("message", "Erro")
                             label, state = "Erro", "error"
                         elif event.type == "complete":
-                            message = Message(
+                            message_pair = MessagePair(
                                 id=event.data.run_id,
-                                role=MessageRole.ASSISTANT,
-                                content=message_content,
-                                artifacts=[],
-                                events=events,
-                                status=message_status,
+                                user_message=user_prompt,
+                                assistant_message=assistant_message,
+                                error_message=error_message,
+                                events=events
                             )
-                            if _has_tool_events(message.events):
+                            if _has_tool_events(message_pair.events):
                                 status.update(label=label, state=state)
                             else:
                                 status_placeholder.empty()
@@ -415,21 +379,21 @@ class ChatPage:
                             status.update(label="Consultando a Base dos Dados...")
                             _display_tool_event(event, container=status)
 
-                    if message.status == MessageStatus.SUCCESS:
-                        st.write_stream(message.stream_words)
+                    if message_pair.assistant_message is not None:
+                        st.write_stream(message_pair.stream_words)
                     else:
-                        st.error(message.content)
+                        st.error(message_pair.error_message)
 
                     # Render buttons immediately to ensure a complete UI before the reload.
                     # NOTE: These specific buttons are discarded on the st.rerun() below,
                     # and then re-rendered from the chat history on the next pass.
-                    self._render_message_buttons(message)
+                    self._render_message_buttons(message_pair)
                 except SessionExpiredException:
                     _show_session_expired_dialog()
                     return
 
             # Add message pair to chat history
-            chat_history.append(message)
+            chat_history.append(message_pair)
 
         # Render the chat deletion button
         self._render_delete_button()
@@ -440,14 +404,16 @@ class ChatPage:
         if page_session_state[self.waiting_key]:
             page_session_state[self.waiting_key] = False
 
-            new_chat: ChatPage | None = st.session_state[NEW_CHAT_KEY]
+            new_chat: ChatPage | None = st.session_state[NEW_CHAT]
 
             # If this page is a new chat page, switch to it
             if new_chat and new_chat.page_id == self.page_id:
                 _clear_new_chat_page()
 
                 current_page = st.Page(
-                    page=self.render, title=self.title, url_path=str(self.thread_id)
+                    page=self.render,
+                    title=self.title,
+                    url_path=str(self.thread_id)
                 )
 
                 st.switch_page(current_page)
@@ -476,7 +442,7 @@ def _show_session_expired_dialog():
 
 def _clear_new_chat_page():
     """Clear new chat page on session state."""
-    st.session_state[NEW_CHAT_KEY] = None
+    st.session_state[NEW_CHAT] = None
 
 
 def _has_tool_events(events: list[StreamEvent]) -> bool:
@@ -493,9 +459,9 @@ def _has_tool_events(events: list[StreamEvent]) -> bool:
 
 def _display_code_block(
     code_block: str,
-    max_lines: int = 10,
-    max_height: int = 256,
-    container: DeltaGenerator | None = None,
+    max_lines: int=10,
+    max_height: int=256,
+    container: DeltaGenerator | None = None
 ):
     """Display a code block in Streamlit with adaptive height.
 
@@ -541,7 +507,11 @@ def _format_tool_args(args: dict[str, Any]) -> str:
     if not sql_query:
         return json.dumps(args, indent=2, ensure_ascii=False)
 
-    sql_query = sqlparse.format(sql_query.strip(), reindent=True, keyword_case="upper")
+    sql_query = sqlparse.format(
+        sql_query.strip(),
+        reindent=True,
+        keyword_case="upper"
+    )
 
     sql_block = f'  "sql_query": `\n{sql_query}\n`'
 
@@ -557,7 +527,11 @@ def _format_tool_outputs(results: str) -> str:
     Returns:
         str: Formatted JSON string.
     """
-    return json.dumps(json.loads(results), ensure_ascii=False, indent=2)
+    return json.dumps(
+        json.loads(results),
+        ensure_ascii=False,
+        indent=2
+    )
 
 
 def _display_tool_event(event: StreamEvent, container: DeltaGenerator | None = None):
@@ -583,14 +557,9 @@ def _display_tool_event(event: StreamEvent, container: DeltaGenerator | None = N
     elif event.type == "tool_output":
         for tool_output in event.data.tool_outputs:
             if tool_output.status == "error":
-                ctx.markdown(
-                    f"Erro na execução da ferramenta `{tool_output.tool_name}`"
-                )
+                ctx.markdown(f"Erro na execução da ferramenta `{tool_output.tool_name}`")
             else:
                 if tool_output.metadata and tool_output.metadata.get("truncated"):
-                    ctx.info(
-                        "Resposta muito extensa. Exibindo resultados parciais.",
-                        icon=":material/info:",
-                    )
-                tool_outputs = _format_tool_outputs(tool_output.content)
+                    ctx.info("Resposta muito extensa. Exibindo resultados parciais.", icon=":material/info:")
+                tool_outputs = _format_tool_outputs(tool_output.output)
                 _display_code_block(f"Resposta:\n{tool_outputs}", container=ctx)
