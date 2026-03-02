@@ -1,28 +1,28 @@
-name: Deploy Production Docker Container
+name: Deploy Development Docker Container
 
 on:
   workflow_run:
     workflows:
-      - "Release Production Docker Image"
+      - "Release Development Docker Image"
     branches:
-      - main
+      - dev
     types:
       - completed
   workflow_dispatch:
 
 jobs:
-  deploy-prod:
+  deploy-dev:
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     environment:
-      name: production
-      url: https://basedosdados.org
+      name: development
+      url: https://development.basedosdados.org
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: dev
 
       - name: Import Secrets
         id: import_secrets
@@ -54,13 +54,13 @@ jobs:
         run: |
           cat << 'EOF' > values.yaml
           chatbotFrontend:
-            name: basedosdados-chatbot-frontend-prod
+            name: basedosdados-chatbot-frontend-dev
             image:
               name: ghcr.io/${{ github.repository }}
-              tag: prod
+              tag: dev
               pullPolicy: Always
             env:
-              API_HOST: api-prod-service
+              API_HOST: api-development-service
               API_PORT: 80
               LOG_LEVEL: INFO
               LOG_BACKTRACE: true
@@ -76,7 +76,7 @@ jobs:
                 memory: 1Gi
             ingress:
               enabled: true
-              host: basedosdados.org
+              host: development.basedosdados.org
               annotations:
                 nginx.ingress.kubernetes.io/use-regex: "true"
                 nginx.ingress.kubernetes.io/rewrite-target: /$2
@@ -87,8 +87,8 @@ jobs:
                   rewrite ^/chatbot-streamlit$ /chatbot-streamlit/ permanent;
               tls:
                 - hosts:
-                    - basedosdados.org
-                  secretName: basedosdados-org-tls
+                    - development.basedosdados.org
+                  secretName: development-basedosdados-org-tls
           EOF
 
       - name: Validate values.yaml file
@@ -101,7 +101,7 @@ jobs:
       - name: Deploy using Helm
         run: |
           helm upgrade \
-          --install basedosdados-chatbot-frontend-prod charts/basedosdados-chatbot-frontend/. \
+          --install basedosdados-chatbot-frontend-dev charts/basedosdados-chatbot-frontend/. \
           --namespace website \
           --values values.yaml \
           --debug \

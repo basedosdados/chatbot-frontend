@@ -39,14 +39,14 @@ _button = """
     }
 """
 
-
 def chart_button_container():
     return stylable_container(
-        key="chart_button_container", css_styles=[_div_chart, _hover, _button]
+        key="chart_button_container",
+        css_styles=[_div_chart, _hover, _button]
     )
-
 
 def code_button_container():
     return stylable_container(
-        key="code_button_container", css_styles=[_div_code, _hover, _button]
+        key="code_button_container",
+        css_styles=[_div_code, _hover, _button]
     )
