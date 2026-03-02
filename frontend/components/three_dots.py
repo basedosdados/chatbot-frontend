@@ -91,8 +91,10 @@ _three_pulsing_dots_animation = """
     </div>
 """
 
+
 def three_waving_dots():
     return st.html(_three_waving_dots_animation)
+
 
 def three_pulsing_dots():
     return st.html(_three_pulsing_dots_animation)
