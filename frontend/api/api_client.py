@@ -95,8 +95,6 @@ class APIClient:
         Returns:
             bool: Whether the user has chatbot access or not.
         """
-        logger.info(f"{access_token = }")
-
         response = httpx.post(
             url=f"{self.base_website_url}/graphql",
             json={
