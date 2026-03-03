@@ -4,6 +4,7 @@ from typing import Iterator
 
 import httpx
 import jwt
+import time
 import streamlit as st
 from loguru import logger
 from pydantic import UUID4
@@ -95,6 +96,7 @@ class APIClient:
         Returns:
             bool: Whether the user has chatbot access or not.
         """
+        start = time.perf_counter()
         response = httpx.post(
             url=f"{self.base_website_url}/graphql",
             json={
@@ -103,6 +105,8 @@ class APIClient:
             },
         )
         response.raise_for_status()
+        elapsed = time.perf_counter() - start
+        logger.info(f"Token verification elapsed time: {elapsed:.4f}s")
 
         payload = response.json()["data"]["verifyToken"]["payload"]
         return payload["has_chatbot_access"]
