@@ -4,7 +4,7 @@ import streamlit as st
 
 from frontend.api import APIClient
 from frontend.components.chat_page import ChatPage
-from frontend.exceptions import SessionExpiredException
+from frontend.exceptions import AccessForbiddenException, SessionExpiredException
 from frontend.settings import settings
 from frontend.utils.constants import NEW_CHAT_KEY
 from frontend.utils.logging import setup_logger
@@ -61,7 +61,12 @@ def login():
                 "Sessão expirada durante o login. Por favor, tente novamente.",
                 icon=":material/error:",
             )
-
+        except AccessForbiddenException:
+            st.session_state.clear()
+            st.error(
+                "Você não possui acesso ao chatbot. Para mais informações, contate um administrador.",
+                icon=":material/block:",
+            )
     elif message is not None:
         st.error(message, icon=":material/error:")
 
