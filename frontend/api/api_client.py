@@ -106,7 +106,7 @@ class APIClient:
         )
         response.raise_for_status()
         elapsed = time.perf_counter() - start
-        logger.info(f"Token verification elapsed time: {elapsed:.4f}s")
+        self.logger.info(f"Token verification elapsed time: {elapsed:.4f}s")
 
         payload = response.json()["data"]["verifyToken"]["payload"]
         return payload["has_chatbot_access"]
