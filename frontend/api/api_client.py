@@ -9,7 +9,7 @@ from loguru import logger
 from pydantic import UUID4
 
 from frontend.datatypes import EventData, Message, StreamEvent, Thread, UserMessage
-from frontend.exceptions import SessionExpiredException
+from frontend.exceptions import AccessForbiddenException, SessionExpiredException
 
 _AUTH_QUERY = """
 mutation getToken($email: String!,  $password: String!) {
@@ -23,6 +23,14 @@ _AUTH_REFRESH_QUERY = """
 mutation refreshToken($token: String!) {
     refreshToken(token: $token) {
         token
+    }
+}
+"""
+
+_VERIFY_TOKEN_QUERY = """
+mutation verifyToken($token: String!) {
+    verifyToken(token: $token) {
+        payload
     }
 }
 """
@@ -78,6 +86,29 @@ class APIClient:
 
         return payload["token"]
 
+    def _verify_token(self, access_token: str) -> bool:
+        """Check if a user has chatbot access.
+
+        Args:
+            access_token (str): The user's access token.
+
+        Returns:
+            bool: Whether the user has chatbot access or not.
+        """
+        logger.info(f"{access_token = }")
+
+        response = httpx.post(
+            url=f"{self.base_website_url}/graphql",
+            json={
+                "query": _VERIFY_TOKEN_QUERY,
+                "variables": {"token": access_token},
+            },
+        )
+        response.raise_for_status()
+
+        payload = response.json()["data"]["verifyToken"]["payload"]
+        return payload["has_chatbot_access"]
+
     def _get_headers(self, access_token: str) -> dict[str, str]:
         """Get authorization headers, refreshing access token as needed.
 
@@ -86,6 +117,7 @@ class APIClient:
 
         Raises:
             SessionExpiredException: If refresh token is None.
+            AccessForbiddenException: If the user does not have chatbot access.
 
         Returns:
             dict[str, str]: The authorization headers,
@@ -95,6 +127,9 @@ class APIClient:
             access_token = self._refresh_access_token(access_token)
 
             if access_token is not None:
+                if not self._verify_token(access_token):
+                    self.logger.info("[AUTH] Access forbidden")
+                    raise AccessForbiddenException
                 st.session_state["access_token"] = access_token
                 self.logger.success("[AUTH] Access token refreshed successfully")
             else:
@@ -102,6 +137,21 @@ class APIClient:
                 raise SessionExpiredException
 
         return {"Authorization": f"Bearer {access_token}"}
+
+    @staticmethod
+    def _raise_for_status(response: httpx.Response):
+        """Raise for HTTP errors, converting 403 into AccessForbiddenException.
+
+        Args:
+            response (httpx.Response): The HTTP response.
+
+        Raises:
+            AccessForbiddenException: If the response status code is 403 (Forbidden).
+            httpx.HTTPStatusError: If the response status code indicates any other error.
+        """
+        if response.status_code == httpx.codes.FORBIDDEN:
+            raise AccessForbiddenException
+        response.raise_for_status()
 
     def authenticate(self, email: str, password: str) -> tuple[str | None, str]:
         """Send a post request to the authentication endpoint.
@@ -132,17 +182,25 @@ class APIClient:
             )
 
             if access_token:
+                if not self._verify_token(access_token):
+                    raise AccessForbiddenException
                 self.logger.success("[AUTH] Successfully logged in")
                 message = "Conectado com sucesso!"
             else:
                 self.logger.error("[AUTH] No access token returned")
         except httpx.HTTPStatusError:
+            access_token = None
             if response.status_code == httpx.codes.UNAUTHORIZED:
-                self.logger.warning("[AUTH] Invalid credentials")
+                self.logger.info("[AUTH] Invalid credentials")
                 message = "Usuário ou senha incorretos."
             else:
                 self.logger.exception("[AUTH] HTTP error:")
+        except AccessForbiddenException:
+            access_token = None
+            message = "Você não possui acesso ao chatbot. Para mais informações, contate um administrador."
+            self.logger.info("[AUTH] Access forbidden")
         except Exception:
+            access_token = None
             self.logger.exception("[AUTH] Login error:")
 
         return access_token, message
@@ -165,13 +223,13 @@ class APIClient:
                 json={"title": title},
                 headers=self._get_headers(access_token),
             )
-            response.raise_for_status()
+            self._raise_for_status(response)
             thread = Thread(**response.json())
             self.logger.success(
                 f"[THREAD] Thread created successfully for user {thread.user_id}"
             )
             return thread
-        except SessionExpiredException:
+        except (SessionExpiredException, AccessForbiddenException):
             raise
         except Exception:
             self.logger.exception("[THREAD] Error on thread creation:")
@@ -193,11 +251,11 @@ class APIClient:
                 params={"order_by": "created_at"},
                 headers=self._get_headers(access_token),
             )
-            response.raise_for_status()
+            self._raise_for_status(response)
             threads = [Thread(**thread) for thread in response.json()]
             self.logger.success("[THREAD] Threads retrieved successfully")
             return threads
-        except SessionExpiredException:
+        except (SessionExpiredException, AccessForbiddenException):
             raise
         except Exception:
             self.logger.exception("[THREAD] Error on threads retrieval:")
@@ -220,13 +278,13 @@ class APIClient:
                 params={"order_by": "created_at"},
                 headers=self._get_headers(access_token),
             )
-            response.raise_for_status()
+            self._raise_for_status(response)
             messages = [Message(**msg) for msg in response.json()]
             self.logger.success(
                 f"[MESSAGE] Messages retrieved successfully for thread {thread_id}"
             )
             return messages
-        except SessionExpiredException:
+        except (SessionExpiredException, AccessForbiddenException):
             raise
         except Exception:
             self.logger.exception(
@@ -264,7 +322,7 @@ class APIClient:
                 json=user_message.model_dump(mode="json"),
                 timeout=httpx.Timeout(5.0, read=300.0),
             ) as response:
-                response.raise_for_status()
+                self._raise_for_status(response)
 
                 self.logger.success("[MESSAGE] User message sent successfully")
 
@@ -278,7 +336,7 @@ class APIClient:
                         stream_completed = True
 
                     yield event
-        except SessionExpiredException:
+        except (SessionExpiredException, AccessForbiddenException):
             raise
         except httpx.ReadTimeout:
             self.logger.exception("[MESSAGE] Timeout error on sending user message:")
@@ -335,10 +393,10 @@ class APIClient:
                 json={"rating": rating, "comments": comments},
                 headers=self._get_headers(access_token),
             )
-            response.raise_for_status()
+            self._raise_for_status(response)
             self.logger.success("[FEEDBACK] Feedback sent successfully")
             return True
-        except SessionExpiredException:
+        except (SessionExpiredException, AccessForbiddenException):
             raise
         except Exception:
             self.logger.exception("[FEEDBACK] Error on sending feedback:")
@@ -362,10 +420,10 @@ class APIClient:
                 headers=self._get_headers(access_token),
                 timeout=httpx.Timeout(5.0, read=60.0),
             )
-            response.raise_for_status()
+            self._raise_for_status(response)
             self.logger.success("[CLEAR] Assistant memory cleared successfully")
             return True
-        except SessionExpiredException:
+        except (SessionExpiredException, AccessForbiddenException):
             raise
         except Exception:
             self.logger.exception("[CLEAR] Error on clearing assistant memory:")

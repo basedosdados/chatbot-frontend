@@ -12,7 +12,7 @@ from streamlit_extras.stylable_container import stylable_container
 from frontend.api import APIClient
 from frontend.components import typewrite, render_disclaimer
 from frontend.datatypes import Message, MessageRole, MessageStatus, StreamEvent
-from frontend.exceptions import SessionExpiredException
+from frontend.exceptions import AccessForbiddenException, SessionExpiredException
 from frontend.utils.constants import NEW_CHAT_KEY
 from frontend.utils.logos import BD_LOGO
 
@@ -61,6 +61,8 @@ class ChatPage:
                 return False
         except SessionExpiredException:
             _show_session_expired_dialog()
+        except AccessForbiddenException:
+            _show_access_forbidden_dialog()
 
     def _handle_send_feedback(self, feedback_id: str, message_id: UUID4):
         """Handle feedback sending.
@@ -128,6 +130,11 @@ class ChatPage:
                         error_placeholder.warning(
                             "Sua sessão expirou. Faça login novamente.",
                             icon=":material/schedule:",
+                        )
+                    except AccessForbiddenException:
+                        error_placeholder.warning(
+                            "Você não possui acesso ao chatbot. Para mais informações, contate um administrador.",
+                            icon=":material/block:",
                         )
 
                 if col2.button("Cancelar"):
@@ -240,6 +247,11 @@ class ChatPage:
                         "Sua sessão expirou. Faça login novamente.",
                         icon=":material/schedule:",
                     )
+                except AccessForbiddenException:
+                    warning_placeholder.warning(
+                        "Você não possui acesso ao chatbot. Para mais informações, contate um administrador.",
+                        icon=":material/block:",
+                    )
 
         page_session_state = st.session_state[self.page_id]
         chat_delete_disabled = page_session_state[self.delete_btn_key]
@@ -298,6 +310,9 @@ class ChatPage:
                     )
                 except SessionExpiredException:
                     _show_session_expired_dialog()
+                    return
+                except AccessForbiddenException:
+                    _show_access_forbidden_dialog()
                     return
             else:
                 messages = []
@@ -427,6 +442,9 @@ class ChatPage:
                 except SessionExpiredException:
                     _show_session_expired_dialog()
                     return
+                except AccessForbiddenException:
+                    _show_access_forbidden_dialog()
+                    return
 
             # Add message pair to chat history
             chat_history.append(message)
@@ -470,6 +488,16 @@ def _show_error_popup(message: str):
 def _show_session_expired_dialog():
     st.write("Sua sessão expirou. Faça login novamente.")
     if st.button("Ir para o login", type="primary"):
+        st.session_state.clear()
+        st.rerun()
+
+
+@st.dialog(":material/block: Acesso Negado")
+def _show_access_forbidden_dialog():
+    st.write(
+        "Você não possui acesso ao chatbot. Para mais informações, contate um administrador."
+    )
+    if st.button("Sair", type="primary"):
         st.session_state.clear()
         st.rerun()
 
