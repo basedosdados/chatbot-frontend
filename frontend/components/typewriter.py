@@ -51,8 +51,6 @@ _typewriter_text = """
     </div>
 """
 
+
 def typewrite(text: str):
-    return st.html(
-        _typewriter_style +
-        _typewriter_text.format(text=text)
-    )
+    return st.html(_typewriter_style + _typewriter_text.format(text=text))
