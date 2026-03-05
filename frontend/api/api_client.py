@@ -86,14 +86,14 @@ class APIClient:
 
         return payload["token"]
 
-    def _verify_token(self, access_token: str) -> bool:
-        """Check if a user has chatbot access.
+    def _is_user_authorized(self, access_token: str) -> bool:
+        """Check if a user is authorized to access the chatbot.
 
         Args:
             access_token (str): The user's access token.
 
         Returns:
-            bool: Whether the user has chatbot access or not.
+            bool: Whether the user is authorized or not.
         """
         response = httpx.post(
             url=f"{self.base_website_url}/graphql",
@@ -125,7 +125,7 @@ class APIClient:
             access_token = self._refresh_access_token(access_token)
 
             if access_token is not None:
-                if not self._verify_token(access_token):
+                if not self._is_user_authorized(access_token):
                     self.logger.info("[AUTH] Access forbidden")
                     raise AccessForbiddenException
                 st.session_state["access_token"] = access_token
@@ -180,7 +180,7 @@ class APIClient:
             )
 
             if access_token:
-                if not self._verify_token(access_token):
+                if not self._is_user_authorized(access_token):
                     raise AccessForbiddenException
                 self.logger.success("[AUTH] Successfully logged in")
                 message = "Conectado com sucesso!"
