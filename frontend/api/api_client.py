@@ -199,8 +199,8 @@ class APIClient:
                 self.logger.exception("[AUTH] HTTP error:")
         except AccessForbiddenException:
             access_token = None
-            message = "Você não possui acesso ao chatbot. Para mais informações, contate um administrador."
             self.logger.info("[AUTH] Access forbidden")
+            raise
         except Exception:
             access_token = None
             self.logger.exception("[AUTH] Login error:")

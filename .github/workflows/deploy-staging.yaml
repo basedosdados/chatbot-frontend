@@ -64,6 +64,7 @@ jobs:
               WEBSITE_PORT: 80
               CHATBOT_HOST: chatbot-api-staging-service
               CHATBOT_PORT: 80
+              BDPRO_URL: https://staging.basedosdados.org/bdpro
             replicas: 1
             resources:
               requests:
