@@ -23,6 +23,7 @@ def login():
 
     access_token = None
     message = None
+    unauthorized = False
 
     with st.form("register_form"):
         email = st.text_input("E-mail")
@@ -31,7 +32,16 @@ def login():
         col1, _ = st.columns(2)
 
         if col1.form_submit_button("Entrar", type="primary"):
-            access_token, message = api.authenticate(email, password)
+            try:
+                access_token, message = api.authenticate(email, password)
+            except AccessForbiddenException:
+                unauthorized = True
+
+    st.success(
+        "**Ainda não é BD Pro?**  \nAssine a **BD Pro** e tenha acesso ao chatbot e outros benefícios exclusivos.  \n"
+        f"[Conheça a BD Pro :material/open_in_new:]({settings.BDPRO_URL})",
+        icon=":material/auto_awesome:",
+    )
 
     if access_token:
         st.session_state["email"] = email
@@ -63,10 +73,14 @@ def login():
             )
         except AccessForbiddenException:
             st.session_state.clear()
-            st.error(
+            st.warning(
                 "Você não possui acesso ao chatbot. Para mais informações, contate um administrador.",
                 icon=":material/block:",
             )
+    elif unauthorized:
+        st.warning(
+            "Sua conta não possui uma assinatura BD Pro ativa.", icon=":material/lock:"
+        )
     elif message is not None:
         st.error(message, icon=":material/error:")
 
