@@ -26,7 +26,7 @@ class Settings(BaseSettings):
         return f"http://{self.CHATBOT_HOST}:{self.CHATBOT_PORT}"
 
     # BD Pro URL settings
-    BDPRO_URL: NonEmptyStr = Field(description="URL to the BD Pro landing page")
+    BDPRO_URL: NonEmptyStr = Field(description="BD Pro landing page URL")
 
     # Logging settings
     LOG_LEVEL: str = Field(
