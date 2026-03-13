@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     def BASE_CHATBOT_URL(self) -> str:
         return f"http://{self.CHATBOT_HOST}:{self.CHATBOT_PORT}"
 
+    # BD Pro URL settings
+    BDPRO_URL: NonEmptyStr = Field(description="URL to the BD Pro landing page")
+
     # Logging settings
     LOG_LEVEL: str = Field(
         default="INFO", description="The minimum severity level for logging messages."
