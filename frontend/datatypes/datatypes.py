@@ -78,7 +78,7 @@ class Message(BaseModel):
     id: UUID4 = Field(default_factory=uuid.uuid4)
     role: MessageRole
     content: str
-    artifacts: list = Field(default_factory=list)
+    artifacts: list[dict] = Field(default_factory=list)
     events: list[StreamEvent] = Field(default_factory=list)
     status: MessageStatus
 
