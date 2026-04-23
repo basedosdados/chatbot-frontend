@@ -396,6 +396,38 @@ class APIClient:
             self.logger.exception("[FEEDBACK] Error on sending feedback:")
             return False
 
+    def get_artifact_download_url(
+        self, access_token: str, message_id: UUID4, artifact_id: str
+    ) -> str | None:
+        """Get a signed URL for downloading a message artifact.
+
+        Args:
+            access_token (str): User access token.
+            message_id (UUID4): The message unique identifier.
+            artifact_id (str): The artifact unique identifier.
+
+        Returns:
+            str|None: The signed URL if the artifact is available. None otherwise.
+        """
+        self.logger.info(
+            f"[ARTIFACT] Retrieving download URL for artifact {artifact_id}"
+        )
+
+        try:
+            response = httpx.get(
+                url=f"{self.base_chatbot_url}/api/v1/chatbot/messages/{message_id}/artifacts/{artifact_id}",
+                headers=self._get_headers(access_token),
+            )
+            self._raise_for_status(response)
+            signed_url = response.json().get("url")
+            self.logger.success("[ARTIFACT] Download URL retrieved successfully")
+            return signed_url
+        except (SessionExpiredException, AccessForbiddenException):
+            raise
+        except Exception:
+            self.logger.exception("[ARTIFACT] Error on retrieving download URL:")
+            raise
+
     def delete_thread(self, access_token: str, thread_id: UUID4) -> bool:
         """Soft delete a thread and hard delete all its checkpoints.
 

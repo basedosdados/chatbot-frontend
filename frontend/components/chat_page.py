@@ -2,6 +2,7 @@ import json
 import uuid
 from typing import Any
 
+import httpx
 import sqlparse
 import streamlit as st
 from loguru import logger
@@ -13,6 +14,7 @@ from frontend.api import APIClient
 from frontend.components import typewrite, render_disclaimer
 from frontend.datatypes import Message, MessageRole, MessageStatus, StreamEvent
 from frontend.exceptions import AccessForbiddenException, SessionExpiredException
+from frontend.utils import format_bytes
 from frontend.utils.constants import NEW_CHAT_KEY
 from frontend.utils.logos import BD_LOGO
 
@@ -265,6 +267,62 @@ class ChatPage:
             on_click=show_delete_chat_modal,
         )
 
+    def _load_artifacts(self, message: Message):
+        """Render a download button for each GCS-backed artifact on the message.
+
+        The file bytes are fetched lazily when the user clicks the button,
+        avoiding an API call on every page rerun.
+
+        Args:
+            message (Message): The assistant message containing artifacts.
+        """
+        disabled = st.session_state[self.page_id][self.waiting_key]
+
+        for artifact in message.artifacts:
+            source = artifact.get("source") or {}
+
+            if source.get("type") != "remote_object":
+                continue
+
+            artifact_id = artifact.get("id")
+            metadata = artifact.get("metadata") or {}
+            filename = metadata.get("filename") or "arquivo"
+            mime_type = metadata.get("mime_type")
+            size_bytes = format_bytes(metadata.get("size_bytes"))
+
+            access_token = st.session_state["access_token"]
+
+            def download_bytes(
+                token: str = access_token,
+                msg_id: UUID4 = message.id,
+                art_id: str = artifact_id,
+            ) -> bytes:
+                try:
+                    signed_url = self.api.get_artifact_download_url(
+                        access_token=token,
+                        message_id=msg_id,
+                        artifact_id=art_id,
+                    )
+
+                    if signed_url is None:
+                        return b""
+
+                    response = httpx.get(signed_url)
+                    response.raise_for_status()
+                    return response.content
+                except Exception as e:
+                    raise Exception("Erro ao baixar o arquivo") from e
+
+            st.download_button(
+                label=f"{filename} ({size_bytes})",
+                data=download_bytes,
+                file_name=filename,
+                mime=mime_type,
+                key=f"artifact_download_{message.id}_{artifact_id}",
+                icon=":material/download:",
+                disabled=disabled,
+            )
+
     def _handle_user_interaction(self):
         """Disable all chat message buttons, comments inputs and the chat input while
         the model is answering a question and enable the chat deletion button rendering.
@@ -355,6 +413,7 @@ class ChatPage:
                     else:
                         st.error(message.content)
 
+                    self._load_artifacts(message)
                     self._render_message_buttons(message)
 
         # Accept user input
@@ -388,6 +447,7 @@ class ChatPage:
             # Display assistant response in chat message container
             with st.chat_message("assistant", avatar=BD_LOGO):
                 events = []
+                artifacts = []
                 status_placeholder = st.empty()
 
                 status = status_placeholder.status("Pensando...")
@@ -418,7 +478,7 @@ class ChatPage:
                                 id=event.data.run_id,
                                 role=MessageRole.ASSISTANT,
                                 content=message_content,
-                                artifacts=[],
+                                artifacts=artifacts,
                                 events=events,
                                 status=message_status,
                             )
@@ -429,15 +489,20 @@ class ChatPage:
                         else:
                             status.update(label="Consultando a Base dos Dados...")
                             _display_tool_event(event, container=status)
+                            if event.type == "tool_output":
+                                for output in event.data.tool_outputs:
+                                    if output.artifact:
+                                        artifacts.append(output.artifact)
 
                     if message.status == MessageStatus.SUCCESS:
                         st.write_stream(message.stream_words)
                     else:
                         st.error(message.content)
 
-                    # Render buttons immediately to ensure a complete UI before the reload.
-                    # NOTE: These specific buttons are discarded on the st.rerun() below,
+                    # Render artifacts and buttons immediately to ensure a complete UI before the reload.
+                    # NOTE: These specific artifacts and buttons are discarded on the st.rerun() below,
                     # and then re-rendered from the chat history on the next pass.
+                    self._load_artifacts(message)
                     self._render_message_buttons(message)
                 except SessionExpiredException:
                     _show_session_expired_dialog()
