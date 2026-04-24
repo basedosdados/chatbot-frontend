@@ -175,30 +175,26 @@ class APIClient:
             )
             response.raise_for_status()
 
-            access_token = (
-                response.json().get("data", {}).get("tokenAuth", {}).get("token")
-            )
+            token_auth = response.json().get("data", {}).get("tokenAuth", {})
 
-            if access_token:
-                if not self._is_user_authorized(access_token):
-                    raise AccessForbiddenException
-                self.logger.success("[AUTH] Successfully logged in")
-                message = "Conectado com sucesso!"
+            if token_auth is not None:
+                access_token = token_auth.get("token") or None
+                if access_token:
+                    if not self._is_user_authorized(access_token):
+                        raise AccessForbiddenException
+                    self.logger.success("[AUTH] Successfully logged in")
+                    message = "Conectado com sucesso!"
+                else:
+                    self.logger.error("[AUTH] No access token returned")
             else:
-                self.logger.error("[AUTH] No access token returned")
-        except httpx.HTTPStatusError:
-            access_token = None
-            if response.status_code == httpx.codes.UNAUTHORIZED:
                 self.logger.info("[AUTH] Invalid credentials")
                 message = "Usuário ou senha incorretos."
-            else:
-                self.logger.exception("[AUTH] HTTP error:")
+        except httpx.HTTPStatusError:
+            self.logger.exception("[AUTH] HTTP error:")
         except AccessForbiddenException:
-            access_token = None
             self.logger.info("[AUTH] Access forbidden")
             raise
         except Exception:
-            access_token = None
             self.logger.exception("[AUTH] Login error:")
 
         return access_token, message
