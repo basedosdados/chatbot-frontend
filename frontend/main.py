@@ -38,8 +38,8 @@ def login():
                 unauthorized = True
 
     st.success(
-        "**Ainda não é BD Pro?**  \nAssine a **BD Pro** e tenha acesso ao chatbot e outros benefícios exclusivos.  \n"
-        f"[Conheça a BD Pro :material/open_in_new:]({settings.BDPRO_URL})",
+        "**Ainda não é assinante?**  \nAssine e tenha acesso ao chatbot e outros benefícios exclusivos.  \n"
+        f"[Conheça os produtos da BD :material/open_in_new:]({settings.BDPRO_URL})",
         icon=":material/auto_awesome:",
     )
 
