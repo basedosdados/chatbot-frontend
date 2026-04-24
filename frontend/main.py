@@ -74,12 +74,12 @@ def login():
         except AccessForbiddenException:
             st.session_state.clear()
             st.warning(
-                "Você não possui acesso ao chatbot. Para mais informações, contate um administrador.",
+                "Você não tem acesso ao chatbot. Para mais informações, contate um administrador.",
                 icon=":material/block:",
             )
     elif unauthorized:
         st.warning(
-            "Sua conta não possui uma assinatura BD Pro ativa.", icon=":material/lock:"
+            "Sua conta não tem uma assinatura ativa.", icon=":material/lock:"
         )
     elif message is not None:
         st.error(message, icon=":material/error:")
