@@ -4,7 +4,6 @@ from typing import Iterator
 
 import httpx
 import jwt
-import time
 import streamlit as st
 from loguru import logger
 from pydantic import UUID4
@@ -87,16 +86,15 @@ class APIClient:
 
         return payload["token"]
 
-    def _verify_token(self, access_token: str) -> bool:
-        """Check if a user has chatbot access.
+    def _is_user_authorized(self, access_token: str) -> bool:
+        """Check if a user is authorized to access the chatbot.
 
         Args:
             access_token (str): The user's access token.
 
         Returns:
-            bool: Whether the user has chatbot access or not.
+            bool: Whether the user is authorized or not.
         """
-        start = time.perf_counter()
         response = httpx.post(
             url=f"{self.base_website_url}/graphql",
             json={
@@ -105,8 +103,6 @@ class APIClient:
             },
         )
         response.raise_for_status()
-        elapsed = time.perf_counter() - start
-        self.logger.info(f"Token verification elapsed time: {elapsed:.4f}s")
 
         payload = response.json()["data"]["verifyToken"]["payload"]
         return payload["has_chatbot_access"]
@@ -129,7 +125,7 @@ class APIClient:
             access_token = self._refresh_access_token(access_token)
 
             if access_token is not None:
-                if not self._verify_token(access_token):
+                if not self._is_user_authorized(access_token):
                     self.logger.info("[AUTH] Access forbidden")
                     raise AccessForbiddenException
                 st.session_state["access_token"] = access_token
@@ -179,30 +175,26 @@ class APIClient:
             )
             response.raise_for_status()
 
-            access_token = (
-                response.json().get("data", {}).get("tokenAuth", {}).get("token")
-            )
+            token_auth = response.json().get("data", {}).get("tokenAuth", {})
 
-            if access_token:
-                if not self._verify_token(access_token):
-                    raise AccessForbiddenException
-                self.logger.success("[AUTH] Successfully logged in")
-                message = "Conectado com sucesso!"
+            if token_auth is not None:
+                access_token = token_auth.get("token") or None
+                if access_token:
+                    if not self._is_user_authorized(access_token):
+                        raise AccessForbiddenException
+                    self.logger.success("[AUTH] Successfully logged in")
+                    message = "Conectado com sucesso!"
+                else:
+                    self.logger.error("[AUTH] No access token returned")
             else:
-                self.logger.error("[AUTH] No access token returned")
-        except httpx.HTTPStatusError:
-            access_token = None
-            if response.status_code == httpx.codes.UNAUTHORIZED:
                 self.logger.info("[AUTH] Invalid credentials")
                 message = "Usuário ou senha incorretos."
-            else:
-                self.logger.exception("[AUTH] HTTP error:")
+        except httpx.HTTPStatusError:
+            self.logger.exception("[AUTH] HTTP error:")
         except AccessForbiddenException:
-            access_token = None
-            message = "Você não possui acesso ao chatbot. Para mais informações, contate um administrador."
             self.logger.info("[AUTH] Access forbidden")
+            raise
         except Exception:
-            access_token = None
             self.logger.exception("[AUTH] Login error:")
 
         return access_token, message

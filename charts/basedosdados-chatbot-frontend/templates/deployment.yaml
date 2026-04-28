@@ -44,6 +44,8 @@ spec:
               value: {{ required ".Values.chatbotFrontend.env.CHATBOT_HOST is required" $env.CHATBOT_HOST | quote }}
             - name: CHATBOT_PORT
               value: {{ required ".Values.chatbotFrontend.env.CHATBOT_PORT is required" $env.CHATBOT_PORT | quote }}
+            - name: BDPRO_URL
+              value: {{ required ".Values.chatbotFrontend.env.BDPRO_URL is required" $env.BDPRO_URL | quote }}
           {{- with .Values.chatbotFrontend.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
